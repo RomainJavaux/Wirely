@@ -26,7 +26,12 @@ export class DevicePalette {
           );
         })
         .join('');
-      return `<h3>${esc(cat)}</h3><div class="devgrid">${items}</div>`;
+      const count = DEVICES.filter((d) => d.category === cat).length;
+      // <details> : repliable nativement (clavier, lecteurs d'écran), fermé par défaut.
+      return (
+        `<details class="cat"><summary><span>${esc(cat)}</span><span class="count">${count}</span></summary>` +
+        `<div class="devgrid">${items}</div></details>`
+      );
     }).join('');
 
     el.addEventListener('pointerdown', (e) => {

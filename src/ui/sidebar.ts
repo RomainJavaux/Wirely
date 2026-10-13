@@ -60,7 +60,11 @@ export class Sidebar {
             `<button data-sym="${s.id}" title="${esc(s.name)}"><svg viewBox="-18 -18 36 36" ${GLYPH_ATTRS}>${s.svg}</svg>${esc(s.name)}</button>`,
         )
         .join('');
-      return `<h3>${esc(cat)}</h3><div class="palette">${buttons}</div>`;
+      const count = SYMBOLS.filter((s) => s.category === cat).length;
+      return (
+        `<details class="cat"><summary><span>${esc(cat)}</span><span class="count">${count}</span></summary>` +
+        `<div class="palette">${buttons}</div></details>`
+      );
     }).join('');
     this.paletteEl.addEventListener('click', (e) => {
       const kind = (e.target as Element).closest<HTMLElement>('[data-sym]')?.dataset.sym;

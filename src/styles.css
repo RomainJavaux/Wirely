@@ -322,3 +322,41 @@ dialog.projects { width: min(560px, calc(100vw - 32px)); }
 .out { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 6px; margin: 0; }
 .out span { text-align: right; color: var(--muted); font-size: 12px; }
 .out input { margin: 0; }
+
+/* ---------- Catégories repliables des palettes ---------- */
+details.cat { border-bottom: 1px solid var(--line); }
+details.cat > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 2px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+details.cat > summary::-webkit-details-marker { display: none; }
+details.cat > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 10px;
+  transition: transform .15s;
+}
+details.cat[open] > summary::before { transform: rotate(90deg); }
+details.cat > summary:hover { color: var(--text); }
+details.cat > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+details.cat > summary .count {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 11px;
+  background: #eef1f6;
+  border-radius: 999px;
+  padding: 0 7px;
+  letter-spacing: 0;
+}
+details.cat[open] > .devgrid,
+details.cat[open] > .palette { padding-bottom: 12px; }
