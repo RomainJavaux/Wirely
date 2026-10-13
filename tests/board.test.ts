@@ -258,3 +258,11 @@ describe('modules Niko sur bus', () => {
     expect(a.groups[0]?.members.map((d) => d.id)).toEqual([dimmer.id]);
   });
 });
+
+describe('calibres', () => {
+  it('l’interrupteur différentiel propose le calibre 32 A', () => {
+    const ratings = getDeviceDef('idiff')?.ratings ?? [];
+    expect(ratings).toContain(32);
+    expect([...ratings]).toEqual([...ratings].sort((a, b) => a - b));
+  });
+});

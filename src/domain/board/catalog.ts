@@ -100,7 +100,7 @@ export const DEVICES: readonly DeviceDef[] = [
     id: 'idiff', category: 'Différentiels', name: 'Interrupteur différentiel', short: 'ID',
     role: 'rcd', refPrefix: 'ID',
     variants: [{ id: '2P', label: '2P', width: 2 }, { id: '4P', label: '4P', width: 4 }], defaultVariant: '2P',
-    ratings: [25, 40, 63, 80, 100], defaultRating: 40,
+    ratings: [25, 32, 40, 63, 80, 100], defaultRating: 40,
     sensitivities: [10, 30, 100, 300, 500], defaultSensitivity: 30,
     diffTypes: DIFF_TYPES, defaultDiffType: 'A',
   },
