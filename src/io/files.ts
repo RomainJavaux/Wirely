@@ -3,11 +3,13 @@ import { parseDoc } from '../domain/document';
 import type { Doc } from '../domain/types';
 import { esc } from '../util/escape';
 
-/** Nom de fichier sûr dérivé du nom du projet. */
-export const fileName = (doc: Doc, ext: string): string =>
-  `${doc.name.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'schema'}.${ext}`;
+/** Nom de fichier sûr dérivé d'un nom de projet. */
+export const safeName = (name: string, ext: string): string =>
+  `${name.replace(/[\\/:*?"<>|]+/g, '_').trim() || 'schema'}.${ext}`;
 
-function download(blob: Blob, name: string): void {
+export const fileName = (doc: Doc, ext: string): string => safeName(doc.name, ext);
+
+export function downloadBlob(blob: Blob, name: string): void {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -17,15 +19,11 @@ function download(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-export function saveJson(doc: Doc): void {
-  download(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }), fileName(doc, 'json'));
-}
+export const downloadSvg = (svg: string, name: string): void =>
+  downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), name);
 
-export function exportSvg(doc: Doc): void {
-  download(new Blob([buildExportSvg(doc)], { type: 'image/svg+xml' }), fileName(doc, 'svg'));
-}
-
-export function exportPng(doc: Doc, scale = 2): void {
+/** Rastérise un SVG autonome (dimensions width/height renseignées) en PNG. */
+export function downloadPng(svg: string, name: string, scale = 2): void {
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement('canvas');
@@ -37,25 +35,38 @@ export function exportPng(doc: Doc, scale = 2): void {
     g.fillRect(0, 0, canvas.width, canvas.height);
     g.scale(scale, scale);
     g.drawImage(img, 0, 0);
-    canvas.toBlob((blob) => blob && download(blob, fileName(doc, 'png')), 'image/png');
+    canvas.toBlob((blob) => blob && downloadBlob(blob, name), 'image/png');
   };
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(buildExportSvg(doc));
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 
-/** Ouvre le plan dans une fenêtre d'impression (choisir « Enregistrer en PDF »). */
-export function exportPdf(doc: Doc): void {
+/** Ouvre une page dans une nouvelle fenêtre et lance l'impression (choisir « Enregistrer en PDF »). */
+export function printHtml(title: string, css: string, body: string): void {
   const w = window.open('', '_blank');
   if (!w) {
     alert('Autorisez les fenêtres pop-up pour exporter en PDF.');
     return;
   }
   w.document.write(
-    `<!doctype html><html><head><meta charset="utf-8"><title>${esc(doc.name)}</title>` +
-      `<style>@page{size:A4 landscape;margin:10mm}body{margin:0;display:flex;justify-content:center}` +
-      `svg{max-width:100%;max-height:100vh;height:auto}</style></head><body>${buildExportSvg(doc)}` +
-      `<script>onload=()=>setTimeout(()=>print(),200)</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head>` +
+      `<body>${body}<script>onload=()=>setTimeout(()=>print(),250)</script></body></html>`,
   );
   w.document.close();
+}
+
+export function saveJson(doc: Doc): void {
+  downloadBlob(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }), fileName(doc, 'json'));
+}
+
+export const exportSvg = (doc: Doc): void => downloadSvg(buildExportSvg(doc), fileName(doc, 'svg'));
+export const exportPng = (doc: Doc): void => downloadPng(buildExportSvg(doc), fileName(doc, 'png'));
+
+export function exportPdf(doc: Doc): void {
+  printHtml(
+    doc.name,
+    '@page{size:A4 landscape;margin:10mm}body{margin:0;display:flex;justify-content:center}svg{max-width:100%;max-height:100vh;height:auto}',
+    buildExportSvg(doc),
+  );
 }
 
 /** Lit un fichier .json choisi par l'utilisateur. Rejette si le contenu est invalide. */

@@ -30,6 +30,13 @@ export function installShortcuts(store: Store, tools: ToolManager, canvas: Canva
       if (e.key === 'Enter') (document.activeElement as HTMLElement).blur();
       return;
     }
+    if (mod && key === 's') {
+      e.preventDefault();
+      saveJson(store.state.doc);
+      return;
+    }
+    // Les raccourcis suivants sont propres au plan (le tableau a les siens).
+    if (store.state.mode !== 'plan') return;
     if (e.code === 'Space') {
       e.preventDefault();
       canvas.setSpacePan(true);
@@ -38,11 +45,6 @@ export function installShortcuts(store: Store, tools: ToolManager, canvas: Canva
     if (mod && key === 'd') {
       e.preventDefault();
       duplicateSelection(store);
-      return;
-    }
-    if (mod && key === 's') {
-      e.preventDefault();
-      saveJson(store.state.doc);
       return;
     }
     if (mod) return;

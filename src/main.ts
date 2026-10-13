@@ -7,6 +7,8 @@ import { enableAutosave, loadSavedDoc } from './io/persistence';
 import { CanvasView } from './render/canvasView';
 import type { ToolContext } from './tools/tool';
 import { ToolManager } from './tools/toolManager';
+import { BoardWorkspace } from './ui/board/boardWorkspace';
+import { ModeSwitch } from './ui/modeSwitch';
 import { qs } from './ui/dom';
 import { PropertiesPanel } from './ui/properties';
 import { installShortcuts } from './ui/shortcuts';
@@ -41,6 +43,8 @@ function bootstrap(): void {
     viewport.fit(unionBounds(store.state.doc.items), width, height);
   };
 
+  new ModeSwitch(store);
+  new BoardWorkspace(store);
   new Sidebar(store);
   new Toolbar(store, fit);
   new Stage(store, viewport, fit);

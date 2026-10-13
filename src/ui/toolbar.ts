@@ -1,5 +1,6 @@
 import type { Store } from '../core/store';
 import { createDoc, parseDoc } from '../domain/document';
+import { exportBoardCsv, exportBoardPdf, exportBoardPng, exportBoardSvg } from '../io/boardSheet';
 import { exportPdf, exportPng, exportSvg, readDocFile, saveJson } from '../io/files';
 import { qs } from './dom';
 
@@ -34,7 +35,14 @@ export class Toolbar {
     this.menuEl.addEventListener('click', (e) => {
       const kind = (e.target as Element).closest<HTMLElement>('[data-exp]')?.dataset.exp;
       const doc = store.state.doc;
-      if (kind === 'png') exportPng(doc);
+      const board = store.activeBoard;
+      if (store.state.mode === 'board') {
+        if (!board) return;
+        if (kind === 'png') exportBoardPng(doc, board);
+        else if (kind === 'svg') exportBoardSvg(doc, board);
+        else if (kind === 'pdf') exportBoardPdf(doc, board);
+        else if (kind === 'csv') exportBoardCsv(board);
+      } else if (kind === 'png') exportPng(doc);
       else if (kind === 'svg') exportSvg(doc);
       else if (kind === 'pdf') exportPdf(doc);
     });
@@ -44,6 +52,7 @@ export class Toolbar {
   }
 
   private sync(): void {
+    this.menuEl.classList.toggle('board-mode', this.store.state.mode === 'board');
     this.undoEl.disabled = !this.store.canUndo;
     this.redoEl.disabled = !this.store.canRedo;
     if (document.activeElement !== this.nameEl) this.nameEl.value = this.store.state.doc.name;

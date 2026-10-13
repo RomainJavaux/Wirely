@@ -1,13 +1,25 @@
+import type { Board, DeviceKind } from '../domain/board/types';
 import type { Doc, Item, SymbolKind, WireTypeId } from '../domain/types';
 
 export type ToolId = 'select' | 'room' | 'wall' | 'wire' | 'symbol' | 'text';
 
+/** Mode d'édition : plan de la maison ou tableau électrique. */
+export type Mode = 'plan' | 'board';
+
 export interface AppState {
   doc: Doc;
+  /** Sélection dans le plan. */
   selection: number | null;
   tool: ToolId;
   symbolKind: SymbolKind | null;
   wireType: WireTypeId;
+  mode: Mode;
+  /** Tableau en cours d'édition. */
+  boardId: number | null;
+  /** Appareil sélectionné dans le tableau. */
+  deviceSelection: number | null;
+  /** Appareil choisi dans la palette, prêt à être posé sur un rail. */
+  armedKind: DeviceKind | null;
 }
 
 type Listener = () => void;
@@ -31,7 +43,17 @@ export class Store {
   private cursor = 0;
 
   constructor(doc: Doc) {
-    this.state = { doc, selection: null, tool: 'select', symbolKind: null, wireType: 'prises' };
+    this.state = {
+      doc,
+      selection: null,
+      tool: 'select',
+      symbolKind: null,
+      wireType: 'prises',
+      mode: 'plan',
+      boardId: doc.boards[0]?.id ?? null,
+      deviceSelection: null,
+      armedKind: null,
+    };
     this.history = [JSON.stringify(doc)];
   }
 
@@ -60,6 +82,10 @@ export class Store {
     return this.getItem(this.state.selection);
   }
 
+  get activeBoard(): Board | undefined {
+    return this.state.doc.boards.find((b) => b.id === this.state.boardId);
+  }
+
   /** Modification transitoire de l'état, sans entrée d'historique. */
   change(mutate: (state: AppState) => void): void {
     mutate(this.state);
@@ -72,6 +98,15 @@ export class Store {
     const index = items.findIndex((i) => i.id === item.id);
     if (index === -1) return;
     items[index] = item;
+    this.notify();
+  }
+
+  /** Remplace un tableau existant (même id), sans entrée d'historique. */
+  updateBoard(board: Board): void {
+    const boards = this.state.doc.boards;
+    const index = boards.findIndex((b) => b.id === board.id);
+    if (index === -1) return;
+    boards[index] = board;
     this.notify();
   }
 
@@ -102,13 +137,24 @@ export class Store {
   replaceDoc(doc: Doc): void {
     this.state.doc = doc;
     this.state.selection = null;
+    this.state.deviceSelection = null;
+    this.state.boardId = doc.boards[0]?.id ?? null;
     this.commit();
+  }
+
+  /** Après annulation ou ouverture : garde un tableau et un appareil valides. */
+  private fixBoardSelection(): void {
+    const { doc } = this.state;
+    if (!doc.boards.some((b) => b.id === this.state.boardId)) this.state.boardId = doc.boards[0]?.id ?? null;
+    const board = this.activeBoard;
+    if (!board?.devices.some((d) => d.id === this.state.deviceSelection)) this.state.deviceSelection = null;
   }
 
   private restore(index: number): void {
     this.cursor = index;
     this.state.doc = JSON.parse(this.history[index] as string) as Doc;
     if (this.getItem(this.state.selection) === undefined) this.state.selection = null;
+    this.fixBoardSelection();
     this.revision++;
     this.notify();
   }

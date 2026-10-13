@@ -8,6 +8,10 @@
 <body>
   <header>
     <span class="title">⚡ Wirely</span>
+    <div class="tabs" role="tablist" aria-label="Mode d'édition">
+      <button data-mode="plan" class="active">🏠 Plan</button>
+      <button data-mode="board">🔌 Tableau</button>
+    </div>
     <input id="docName" type="text" placeholder="Nom du projet" aria-label="Nom du projet">
     <span class="sep"></span>
     <button id="undo" title="Annuler (Ctrl+Z)">↶ Annuler</button>
@@ -22,12 +26,13 @@
         <button data-exp="png">Image PNG</button>
         <button data-exp="svg">Image SVG</button>
         <button data-exp="pdf">PDF / Imprimer</button>
+        <button data-exp="csv" class="board-only">Circuits (CSV)</button>
       </div>
     </div>
     <input id="fileIn" type="file" accept=".json,application/json" hidden>
   </header>
 
-  <main>
+  <main id="planMain">
     <aside class="left">
       <h3>Outils</h3>
       <div class="tools" id="tools"></div>
@@ -60,6 +65,58 @@
     </div>
 
     <aside class="right"><div id="props"></div></aside>
+  </main>
+
+  <main id="boardMain" hidden>
+    <aside class="left" id="boardPalette"></aside>
+
+    <div id="boardStage">
+      <div id="boardEmpty" class="board-empty">
+        <div>
+          <h2>Configurez votre tableau électrique</h2>
+          <p>Posez des appareils sur des rails DIN, nommez vos circuits, et obtenez automatiquement
+            la face avant étiquetée, le schéma unifilaire, la liste des circuits et la nomenclature.</p>
+          <div class="row">
+            <button class="primary" id="bEmptyExample">Partir d'un exemple (logement)</button>
+            <button id="bEmptyBlank">Tableau vide</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="boardContent">
+        <div id="boardBar">
+          <select id="bSelect" aria-label="Tableau"></select>
+          <button id="bAdd" title="Ajouter un tableau">+ Tableau</button>
+          <button id="bDel" class="danger" title="Supprimer ce tableau">Supprimer</button>
+          <span class="sep"></span>
+          <input id="bName" type="text" placeholder="Nom du tableau" aria-label="Nom du tableau">
+          <input id="bLoc" type="text" placeholder="Emplacement (ex. Garage)" aria-label="Emplacement">
+          <select id="bSupply" aria-label="Alimentation">
+            <option value="mono">Monophasé 230 V</option>
+            <option value="tri">Triphasé 400 V</option>
+          </select>
+          <select id="bCols" aria-label="Largeur du tableau"></select>
+          <span class="rails">Rails
+            <button id="bRowMinus" title="Retirer un rail vide">−</button>
+            <b id="bRows">3</b>
+            <button id="bRowPlus" title="Ajouter un rail">+</button>
+          </span>
+          <button id="bCompact" title="Aligner les appareils à gauche, sans trous">Compacter</button>
+          <span class="spacer"></span>
+          <div class="seg">
+            <button id="bViewFront" class="active">Face avant</button>
+            <button id="bViewUni">Unifilaire</button>
+          </div>
+          <button id="bZoomOut" title="Dézoomer">−</button>
+          <button id="bFit" title="Ajuster à la fenêtre">Ajuster</button>
+          <button id="bZoomIn" title="Zoomer">+</button>
+        </div>
+        <div id="boardScroll"><div id="boardHost"></div></div>
+        <div id="boardHint"></div>
+      </div>
+    </div>
+
+    <aside class="right" id="boardSide"></aside>
   </main>
 
   <script type="module" src="/src/main.ts"></script>

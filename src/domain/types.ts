@@ -1,4 +1,5 @@
 /** Modèle du document : types purs, sans dépendance au DOM. */
+import type { Board } from './board/types';
 
 export type Point = [number, number];
 export type Rotation = 0 | 90 | 180 | 270;
@@ -55,7 +56,11 @@ export type NewItem = DistributiveOmit<Item, 'id'>;
 
 export interface Doc {
   name: string;
+  /** Éléments du plan. */
   items: Item[];
+  /** Tableaux électriques du projet. */
+  boards: Board[];
+  /** Compteur d'identifiants partagé par le plan et les tableaux. */
   nextId: number;
 }
 

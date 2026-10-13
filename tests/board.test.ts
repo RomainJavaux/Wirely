@@ -1,0 +1,178 @@
+import { describe, expect, it } from 'vitest';
+import { circuitRows, circuitsCsv, bomLines } from '../src/domain/board/bom';
+import { getDeviceDef } from '../src/domain/board/catalog';
+import { runChecks } from '../src/domain/board/checks';
+import { analyze, canPlace, compactDevices, createDevice, deviceWidth, firstFreeSlot } from '../src/domain/board/layout';
+import { parseBoards } from '../src/domain/board/parse';
+import { buildBoard } from '../src/domain/board/templates';
+import type { Board } from '../src/domain/board/types';
+import { createDoc, parseDoc } from '../src/domain/document';
+import { buildBoardSheetSvg } from '../src/io/boardSheet';
+
+let id = 100;
+const next = () => id++;
+const dev = (kind: string, row: number, col: number, patch = {}) => {
+  const def = getDeviceDef(kind);
+  if (!def) throw new Error(kind);
+  return createDevice(def, next(), row, col, patch);
+};
+const board = (devices: Board['devices'], over: Partial<Board> = {}): Board => ({
+  id: 1, name: 'T', location: '', supply: 'mono', cols: 13, rows: 2, devices, ...over,
+});
+
+describe('placement sur les rails', () => {
+  it('refuse un chevauchement et un dépassement', () => {
+    const b = board([dev('idiff', 0, 0)]); // 2 modules : 0 et 1
+    expect(canPlace(b, 0, 1, 1)).toBe(false);
+    expect(canPlace(b, 0, 2, 1)).toBe(true);
+    expect(canPlace(b, 0, 12, 2)).toBe(false);
+    expect(canPlace(b, 2, 0, 1)).toBe(false);
+  });
+
+  it('ignore l’appareil déplacé lui-même', () => {
+    const d = dev('disj', 0, 3);
+    expect(canPlace(board([d]), 0, 3, 1, d.id)).toBe(true);
+  });
+
+  it('trouve le premier emplacement libre', () => {
+    const b = board([dev('disj', 0, 0), dev('disj', 0, 1)]);
+    expect(firstFreeSlot(b, 1)).toEqual({ row: 0, col: 2 });
+    expect(firstFreeSlot(board([], { cols: 6, rows: 1 }), 7)).toBeNull();
+  });
+
+  it('compacte chaque rail en conservant l’ordre', () => {
+    const b = board([dev('disj', 0, 5, { label: 'b' }), dev('disj', 0, 2, { label: 'a' }), dev('idiff', 1, 4)]);
+    const out = compactDevices(b);
+    expect(out.filter((d) => d.row === 0).map((d) => [d.label, d.col])).toEqual([['a', 0], ['b', 1]]);
+    expect(out.find((d) => d.row === 1)?.col).toBe(0);
+  });
+
+  it('utilise la largeur de la variante', () => {
+    expect(deviceWidth(dev('disj', 0, 0, { variant: '3P' }))).toBe(3);
+    expect(deviceWidth(dev('agcp', 0, 0))).toBe(3);
+  });
+});
+
+describe('analyse électrique', () => {
+  it('un différentiel protège les disjoncteurs à sa droite jusqu’au suivant', () => {
+    const id1 = dev('idiff', 0, 0);
+    const a1 = dev('disj', 0, 2);
+    const id2 = dev('idiff', 0, 3);
+    const a2 = dev('disj', 0, 5);
+    const a = analyze(board([id1, a1, id2, a2]));
+    expect(a.protectedBy.get(a1.id)?.id).toBe(id1.id);
+    expect(a.protectedBy.get(a2.id)?.id).toBe(id2.id);
+  });
+
+  it('un disjoncteur sans différentiel amont n’est pas protégé', () => {
+    const d = dev('disj', 0, 0);
+    expect(analyze(board([d])).protectedBy.get(d.id)).toBeNull();
+  });
+
+  it('le différentiel d’un rail ne protège pas le rail suivant', () => {
+    const d = dev('disj', 1, 0);
+    expect(analyze(board([dev('idiff', 0, 0), d])).protectedBy.get(d.id)).toBeNull();
+  });
+
+  it('numérote les circuits dans l’ordre rail par rail', () => {
+    const a = dev('disj', 1, 0);
+    const b = dev('disj', 0, 4);
+    const c = dev('disj', 0, 1);
+    const refs = analyze(board([a, b, c])).refs;
+    expect([c, b, a].map((d) => refs.get(d.id))).toEqual(['1', '2', '3']);
+  });
+});
+
+describe('contrôles', () => {
+  const codes = (b: Board) => runChecks(b).map((c) => `${c.severity}:${c.message}`);
+
+  it('signale un calibre trop élevé pour la section', () => {
+    const b = board([dev('idiff', 0, 0), dev('disj', 0, 2, { rating: 32, section: 1.5, label: 'Four' })]);
+    expect(codes(b).some((m) => m.startsWith('error:') && m.includes('trop élevé'))).toBe(true);
+  });
+
+  it('accepte une section déduite automatiquement', () => {
+    const b = board([dev('idiff', 0, 0), dev('disj', 0, 2, { rating: 32, label: 'Four' })]);
+    expect(codes(b).some((m) => m.includes('trop élevé'))).toBe(false);
+  });
+
+  it('signale l’absence de différentiel en amont', () => {
+    const b = board([dev('disj', 0, 0, { label: 'x' })]);
+    expect(codes(b).some((m) => m.includes('aucun différentiel'))).toBe(true);
+  });
+
+  it('signale un différentiel trop chargé', () => {
+    const circuits = Array.from({ length: 6 }, (_, i) => dev('disj', 0, 2 + i, { label: `c${i}` }));
+    const b = board([dev('idiff', 0, 0, { rating: 25 }), ...circuits]);
+    expect(codes(b).some((m) => m.includes('maximum conseillé'))).toBe(true);
+  });
+
+  it('rappelle la réserve de 20 % quand le tableau est plein', () => {
+    const full = Array.from({ length: 13 }, (_, i) => dev('disj', 0, i, { label: 'x' }));
+    const b = board([dev('idiff', 1, 0), ...full], { rows: 1, cols: 13 });
+    expect(codes(b).some((m) => m.startsWith('info:Réserve'))).toBe(true);
+  });
+
+  it('un exemple de logement est sans erreur bloquante', () => {
+    let n = 1;
+    const ex = buildBoard('logement', 'Ex', () => n++);
+    expect(runChecks(ex).filter((c) => c.severity === 'error')).toEqual([]);
+  });
+});
+
+describe('documentation', () => {
+  const example = (): Board => {
+    let n = 1;
+    return buildBoard('logement', 'Principal', () => n++);
+  };
+
+  it('génère le tableau de repérage des circuits', () => {
+    const rows = circuitRows(example());
+    expect(rows.length).toBe(12);
+    expect(rows[0]).toMatchObject({ ref: '1', label: 'Éclairage', section: '1,5 mm²' });
+    expect(rows[4]).toMatchObject({ label: 'Plaque de cuisson', section: '6 mm²' });
+  });
+
+  it('regroupe les appareils identiques dans la nomenclature', () => {
+    const lines = bomLines(example());
+    const total = lines.reduce((s, l) => s + l.qty, 0);
+    expect(total).toBe(example().devices.length);
+    expect(lines.length).toBeLessThan(total);
+  });
+
+  it('exporte un CSV Excel (BOM, séparateur point-virgule, guillemets échappés)', () => {
+    const b = board([dev('idiff', 0, 0), dev('disj', 0, 2, { label: 'Prises "salon"; cuisine' })]);
+    const csv = circuitsCsv(b);
+    expect(csv.startsWith('﻿Repère;Désignation')).toBe(true);
+    expect(csv).toContain('"Prises ""salon""; cuisine"');
+  });
+
+  it('produit une fiche SVG complète', () => {
+    const doc = createDoc('Maison');
+    doc.boards.push(example());
+    const svg = buildBoardSheetSvg(doc, doc.boards[0] as Board, new Date('2026-01-01'));
+    for (const text of ['Principal', 'Face avant', 'Schéma unifilaire', 'Repérage des circuits', 'Nomenclature']) {
+      expect(svg).toContain(text);
+    }
+    expect(svg).not.toContain('data-dev');
+  });
+});
+
+describe('persistance', () => {
+  it('valide et normalise les tableaux', () => {
+    const boards = parseBoards([
+      { id: 1, name: '', cols: 999, rows: 0, devices: [{ id: 2, kind: 'disj', row: 0, col: 0, variant: 'bidon' }, { id: 3, kind: 'inconnu', row: 0, col: 0 }] },
+      'oups',
+    ]);
+    expect(boards).toHaveLength(1);
+    expect(boards[0]).toMatchObject({ name: 'Tableau', cols: 36, rows: 1 });
+    expect(boards[0]?.devices).toHaveLength(1);
+    expect(boards[0]?.devices[0]?.variant).toBe('1P+N');
+  });
+
+  it('un ancien fichier sans tableaux reste lisible, et les ids ne collisionnent pas', () => {
+    expect(parseDoc({ name: 'a', items: [] }).boards).toEqual([]);
+    const doc = parseDoc({ items: [], boards: [{ id: 40, devices: [{ id: 41, kind: 'disj', row: 0, col: 0 }] }] });
+    expect(doc.nextId).toBeGreaterThan(41);
+  });
+});

@@ -1,3 +1,4 @@
+import { parseBoards } from './board/parse';
 import { WIRE_TYPES } from './catalog';
 import type { Doc, Item, ItemType, Point, Rotation } from './types';
 
@@ -6,7 +7,7 @@ export const DEFAULT_NAME = 'Mon installation';
 /** Ordre de dessin : les pièces au fond, les textes au-dessus. */
 const DRAW_ORDER: readonly ItemType[] = ['room', 'wall', 'wire', 'symbol', 'text'];
 
-export const createDoc = (name = DEFAULT_NAME): Doc => ({ name, items: [], nextId: 1 });
+export const createDoc = (name = DEFAULT_NAME): Doc => ({ name, items: [], boards: [], nextId: 1 });
 
 export const sortedForDrawing = (items: readonly Item[]): Item[] =>
   [...items].sort((a, b) => DRAW_ORDER.indexOf(a.type) - DRAW_ORDER.indexOf(b.type));
@@ -53,10 +54,15 @@ export function parseDoc(raw: unknown): Doc {
   const r = raw as Record<string, unknown>;
   if (!Array.isArray(r.items)) throw new Error('Document invalide : liste d’éléments manquante');
   const items = r.items.map(parseItem).filter((i): i is Item => i !== null);
-  const maxId = items.reduce((m, i) => Math.max(m, i.id), 0);
+  const boards = parseBoards(r.boards);
+  const maxId = Math.max(
+    items.reduce((m, i) => Math.max(m, i.id), 0),
+    ...boards.flatMap((b) => [b.id, ...b.devices.map((d) => d.id)]),
+  );
   return {
     name: isStr(r.name) && r.name.trim() ? r.name : DEFAULT_NAME,
     items,
+    boards,
     nextId: Math.max(maxId + 1, isNum(r.nextId) ? r.nextId : isNum(r.nid) ? r.nid : 1),
   };
 }
