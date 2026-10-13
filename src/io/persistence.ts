@@ -15,12 +15,16 @@ export function loadSavedDoc(): Doc | null {
   }
 }
 
-/** Sauvegarde automatiquement à chaque étape d'historique validée. */
-export function enableAutosave(store: Store): void {
+/**
+ * Sauvegarde automatiquement le brouillon à chaque étape d'historique validée.
+ * `enabled` permet de s'abstenir (projet en ligne : le serveur est la référence).
+ */
+export function enableAutosave(store: Store, enabled: () => boolean = () => true): void {
   let last = store.revision;
   store.subscribe(() => {
     if (store.revision === last) return;
     last = store.revision;
+    if (!enabled()) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(store.state.doc));
     } catch {

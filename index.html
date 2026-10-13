@@ -17,6 +17,8 @@
     <button id="undo" title="Annuler (Ctrl+Z)">↶ Annuler</button>
     <button id="redo" title="Rétablir (Ctrl+Y)">↷ Rétablir</button>
     <span class="spacer"></span>
+    <div id="cloudBar" class="cloud-bar"></div>
+    <span class="sep"></span>
     <button id="newDoc">Nouveau</button>
     <button id="openDoc">Ouvrir…</button>
     <button id="saveDoc">Enregistrer (.json)</button>
@@ -31,6 +33,7 @@
     </div>
     <input id="fileIn" type="file" accept=".json,application/json" hidden>
   </header>
+  <div id="banner" class="banner" hidden></div>
 
   <main id="planMain">
     <aside class="left">

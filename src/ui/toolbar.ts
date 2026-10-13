@@ -1,3 +1,4 @@
+import type { Cloud } from '../cloud/cloud';
 import type { Store } from '../core/store';
 import { createDoc, parseDoc } from '../domain/document';
 import { exportBoardCsv, exportBoardPdf, exportBoardPng, exportBoardSvg } from '../io/boardSheet';
@@ -14,6 +15,7 @@ export class Toolbar {
 
   constructor(
     private readonly store: Store,
+    private readonly cloud: Cloud,
     private readonly fit: () => void,
   ) {
     this.undoEl.onclick = () => store.undo();
@@ -60,7 +62,10 @@ export class Toolbar {
 
   private newDoc(): void {
     const { doc } = this.store.state;
-    if (doc.items.length && !confirm('Créer un nouveau projet ? Le projet actuel sera remplacé (vous pouvez annuler ensuite avec Ctrl+Z).')) return;
+    const online = this.cloud.remote.kind !== 'local';
+    if (!online && doc.items.length && !confirm('Créer un nouveau projet ? Le projet actuel sera remplacé (vous pouvez annuler ensuite avec Ctrl+Z).')) return;
+    // Un schéma en ligne n'est jamais remplacé : on repart d'un brouillon local.
+    if (online) this.cloud.leaveToLocal();
     this.store.replaceDoc(createDoc());
     this.fit();
   }
@@ -70,7 +75,10 @@ export class Toolbar {
     this.fileEl.value = '';
     if (!file) return;
     try {
-      this.store.replaceDoc(parseDoc(await readDocFile(file)));
+      const doc = parseDoc(await readDocFile(file));
+      // Idem : le fichier ouvert devient un brouillon local, il n'écrase pas le schéma en ligne.
+      if (this.cloud.remote.kind !== 'local') this.cloud.leaveToLocal();
+      this.store.replaceDoc(doc);
       this.fit();
     } catch {
       alert('Fichier invalide.');

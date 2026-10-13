@@ -1,6 +1,14 @@
-# Déploiement Hostinger : le site servi est le build Vite commité dans dist/.
-# L'hébergeur ne lance pas "npm run build" ; on publie donc dist/ tel quel.
+# Déploiement Hostinger.
+#  - /api/...  -> API Laravel (backend/, installé hors du web)
+#  - le reste  -> build Vite commité dans dist/ (l'hébergeur ne lance pas "npm run build")
 Options -Indexes
 RewriteEngine On
+
+# Certains hébergeurs (CGI/FastCGI) ne transmettent pas l'en-tête Authorization à PHP.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+RewriteRule ^api(/.*)?$ api/index.php [L]
+
 RewriteCond %{REQUEST_URI} !^/dist/
 RewriteRule ^(.*)$ dist/$1 [L]

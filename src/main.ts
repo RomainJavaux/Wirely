@@ -1,4 +1,6 @@
 import './styles.css';
+import { Auth } from './cloud/auth';
+import { Cloud } from './cloud/cloud';
 import { Store } from './core/store';
 import { Viewport } from './core/viewport';
 import { createDoc } from './domain/document';
@@ -8,6 +10,7 @@ import { CanvasView } from './render/canvasView';
 import type { ToolContext } from './tools/tool';
 import { ToolManager } from './tools/toolManager';
 import { BoardWorkspace } from './ui/board/boardWorkspace';
+import { CloudBar } from './ui/cloud/cloudBar';
 import { ModeSwitch } from './ui/modeSwitch';
 import { qs } from './ui/dom';
 import { PropertiesPanel } from './ui/properties';
@@ -43,15 +46,21 @@ function bootstrap(): void {
     viewport.fit(unionBounds(store.state.doc.items), width, height);
   };
 
+  const auth = new Auth();
+  const cloud = new Cloud(store, auth);
+
   new ModeSwitch(store);
   new BoardWorkspace(store);
   new Sidebar(store);
-  new Toolbar(store, fit);
+  new CloudBar(auth, cloud);
+  new Toolbar(store, cloud, fit);
   new Stage(store, viewport, fit);
   installShortcuts(store, tools, canvas);
-  enableAutosave(store);
+  // Le brouillon n'est gardé dans le navigateur que s'il n'est pas lié à un schéma en ligne.
+  enableAutosave(store, () => cloud.savesLocally);
 
   fit();
+  void cloud.start().then(fit);
 }
 
 bootstrap();

@@ -17,11 +17,32 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm test           # tests unitaires (Vitest)
+cd backend && composer install && cd ..   # une fois : dépendances PHP (Laravel)
+npm run api        # API Laravel sur http://127.0.0.1:8000
+npm run dev        # front sur http://localhost:5173 (proxy /api -> :8000)
+npm test           # tests front (Vitest)
+npm run api:test   # tests API (PHPUnit)
 npm run typecheck
 npm run build      # sortie dans dist/
 ```
+
+Sans l'API, l'éditeur fonctionne toujours en local (brouillon dans le navigateur) ;
+seuls les comptes et le partage en ligne sont indisponibles.
+
+## Comptes et partage
+
+Chaque schéma peut être enregistré dans un compte et obtenir un lien court
+`https://…/#/p/<id>` :
+
+- **Brouillon local** (`#/`) : enregistré dans le navigateur, sans compte.
+- **Enregistrer en ligne** : crée le schéma dans le compte, l'URL reçoit son id, puis chaque
+  modification est enregistrée automatiquement (détection des modifications concurrentes).
+- **Partager** : active la consultation par lien. Les visiteurs voient le schéma en lecture
+  seule (leurs modifications ne sont pas enregistrées) et peuvent le **dupliquer** dans leur
+  compte. Seul le propriétaire modifie le schéma ; un schéma privé répond 404 aux autres.
+
+Pas de réinitialisation du mot de passe ni de vérification d'e-mail pour l'instant (cela
+suppose un envoi de courriels).
 
 ## Architecture
 
@@ -38,8 +59,11 @@ src/
   io/        Export (SVG/PNG/PDF/CSV), fiche du tableau, fichiers JSON, sauvegarde automatique
   ui/        Panneaux : barre du haut, palette, propriétés, raccourcis
     board/   Espace de travail du tableau : palette d'appareils, glisser-déposer, réglages
+  cloud/     Client d'API, authentification, synchronisation du projet ouvert (URL #/p/<id>)
   main.ts    Racine de composition
-tests/       Tests du domaine, du store et de l'export
+tests/       Tests du domaine, du store, de l'export et du client d'API
+api/         Point d'entrée de production de l'API (/api/* -> Laravel)
+backend/     API Laravel 13 : comptes (Sanctum), projets, partage (SQLite)
 ```
 
 ### Principes
@@ -61,13 +85,36 @@ l'ouverture (`parseDoc`) ; les anciens fichiers (`nid`) restent lisibles.
 ## Déploiement (Hostinger, par git)
 
 L'hébergeur déploie les fichiers du dépôt sans lancer de build. Le build Vite est donc
-**commité dans `dist/`** et `.htaccess` sert ce dossier à la racine du site.
+**commité dans `dist/`**, et `.htaccess` envoie `/api/*` vers Laravel et le reste vers `dist/`.
 
-À chaque modification du code, avant de commiter :
+### À chaque modification du code
 
 ```bash
 npm run build      # régénère dist/
 git add -A && git commit
+git push
 ```
 
-Un `git push` suffit ensuite à publier.
+### Première installation de l'API (une seule fois, en SSH)
+
+`backend/vendor/`, `backend/.env` et la base SQLite ne sont **pas** dans git : ils se créent
+sur le serveur. Dans le terminal SSH de l'hébergeur (PHP 8.3 ou plus, à régler dans hPanel) :
+
+```bash
+cd backend
+composer install --no-dev --optimize-autoloader
+cp .env.example .env
+php artisan key:generate --force
+touch database/database.sqlite
+php artisan migrate --force
+```
+
+Vérifications :
+
+- `https://<votre-domaine>/api/up` répond 200 ;
+- `https://<votre-domaine>/backend/.env` et `/backend/database/database.sqlite` répondent **404**.
+
+Ensuite, un `git push` suffit. Si une mise à jour ajoute une migration, relancez
+`php artisan migrate --force` dans `backend/`.
+
+Pensez à régler `APP_URL` dans `backend/.env` sur l'adresse réelle du site.

@@ -142,6 +142,21 @@ export class Store {
     this.commit();
   }
 
+  /**
+   * Remplace le document et repart d'un historique vierge (ouverture d'un projet en ligne,
+   * retour au brouillon). Contrairement à `replaceDoc`, ce n'est pas annulable.
+   */
+  reset(doc: Doc): void {
+    this.state.doc = doc;
+    this.state.selection = null;
+    this.state.deviceSelection = null;
+    this.state.boardId = doc.boards[0]?.id ?? null;
+    this.history = [JSON.stringify(doc)];
+    this.cursor = 0;
+    this.revision++;
+    this.notify();
+  }
+
   /** Après annulation ou ouverture : garde un tableau et un appareil valides. */
   private fixBoardSelection(): void {
     const { doc } = this.state;
