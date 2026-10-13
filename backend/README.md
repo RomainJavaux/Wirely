@@ -3,7 +3,8 @@
 API JSON des comptes et des schémas partagés. Le front est le site statique à la racine du dépôt.
 
 - Authentification par jetons **Sanctum** (en-tête `Authorization: Bearer …`).
-- Stockage **SQLite** (`database/database.sqlite`, non versionné).
+- Stockage **MySQL** en production (`.env`, non versionné). **SQLite** pour le développement
+  local et les tests (`DB_CONNECTION=sqlite`).
 - Routes sans préfixe : en production `/api/index.php` retire déjà `/api` du chemin ;
   en développement, le proxy Vite fait de même.
 

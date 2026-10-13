@@ -63,7 +63,7 @@ src/
   main.ts    Racine de composition
 tests/       Tests du domaine, du store, de l'export et du client d'API
 api/         Point d'entrée de production de l'API (/api/* -> Laravel)
-backend/     API Laravel 13 : comptes (Sanctum), projets, partage (SQLite)
+backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLite en local)
 ```
 
 ### Principes
@@ -95,26 +95,29 @@ git add -A && git commit
 git push
 ```
 
-### Première installation de l'API (une seule fois, en SSH)
+### Première installation de l'API (une seule fois)
 
-`backend/vendor/`, `backend/.env` et la base SQLite ne sont **pas** dans git : ils se créent
-sur le serveur. Dans le terminal SSH de l'hébergeur (PHP 8.3 ou plus, à régler dans hPanel) :
+`backend/vendor/` et `backend/.env` ne sont **pas** dans git : ils se créent sur le serveur.
+
+1. **Créer la base MySQL** dans hPanel (Bases de données → Gestion MySQL) : notez le nom de la
+   base, l'utilisateur et le mot de passe (Hostinger les préfixe, par exemple `u123456789_wirely`).
+2. **En SSH** (PHP 8.3 ou plus, à régler dans hPanel), dans le dossier du site :
 
 ```bash
 cd backend
 composer install --no-dev --optimize-autoloader
 cp .env.example .env
 php artisan key:generate --force
-touch database/database.sqlite
+nano .env          # renseigner DB_DATABASE, DB_USERNAME, DB_PASSWORD et APP_URL
 php artisan migrate --force
 ```
 
 Vérifications :
 
+- `php artisan migrate` ne signale aucune erreur ;
 - `https://<votre-domaine>/api/up` répond 200 ;
-- `https://<votre-domaine>/backend/.env` et `/backend/database/database.sqlite` répondent **404**.
+- `https://<votre-domaine>/backend/.env` répond **404**.
 
 Ensuite, un `git push` suffit. Si une mise à jour ajoute une migration, relancez
 `php artisan migrate --force` dans `backend/`.
 
-Pensez à régler `APP_URL` dans `backend/.env` sur l'adresse réelle du site.
