@@ -233,6 +233,12 @@ export const DEVICES: readonly DeviceDef[] = [
     info: '12 sorties · 230 V AC', tone: BUS_SYSTEMS.nikobus.tone, ...fixed(14),
     source: 'https://www.cebeo.be/catalog/fr-be/products/niko-nikobus-dimcontroller-230v-ac-largeur-14e-3458845',
   },
+  {
+    id: 'nb_dim4', category: 'Niko · Nikobus', name: 'Mini-dimcontroller 4 × 0-10 V', short: 'DIM4',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-008-02', outputs: 4,
+    info: '4 sorties 0-10 V · commande 2 mA', tone: BUS_SYSTEMS.nikobus.tone, ...fixed(4),
+    source: 'https://www.cebeo.be/catalog/nl-be/products/niko-nikobus-compacte-dimcontroller-4x-0-10v-out-breedte-4e-3508453',
+  },
 
   // --- Niko : Niko Home Control II, largeurs d'après les fiches Niko
   {
@@ -270,6 +276,14 @@ export const DEVICES: readonly DeviceDef[] = [
     role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00340', outputs: 2,
     info: '2 sorties 400 W', tone: BUS_SYSTEMS.nhc2.tone, ...fixed(4),
     source: 'https://www.niko.eu/en/article/550-00340',
+  },
+
+  // --- Niko : variateur modulaire autonome (commande par bouton-poussoir, hors bus)
+  {
+    id: 'niko_dimmer', category: 'Niko · Variateurs', name: 'Variateur universel modulaire', short: 'DIM',
+    role: 'aux', refPrefix: 'DM', ref: '330-00700', info: '5–350 W · commande par poussoir · 230 V',
+    ...fixed(1),
+    source: 'https://www.cebeo.be/catalog/nl-be/products/niko-universele-modulaire-dimmer-met-cab-ontstoring-5-350-w-4166664',
   },
 ];
 

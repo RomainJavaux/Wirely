@@ -184,6 +184,8 @@ describe('modules Niko sur bus', () => {
     expect(width('nb_sw4')).toBe(4); // 05-002-02
     expect(width('nb_pclink')).toBe(4); // 05-200
     expect(width('nb_dim')).toBe(14); // 05-007-02, fiche Cebeo : 14E
+    expect(width('nb_dim4')).toBe(4); // 05-008-02, fiche Cebeo : 4E
+    expect(width('niko_dimmer')).toBe(1); // 330-00700, 17,5 mm
     expect(width('nhc_cc')).toBe(6); // 550-00003
     expect(width('nhc_ps')).toBe(4); // 550-00010
     expect(width('nhc_rc')).toBe(2); // 550-00020
@@ -192,7 +194,7 @@ describe('modules Niko sur bus', () => {
   });
 
   it('chaque module du bus cite sa fiche, et les données incertaines sont signalées', () => {
-    for (const kind of ['nb_sw12', 'nb_sw4', 'nb_dim', 'nb_pclink', 'nhc_cc', 'nhc_ps', 'nhc_rc', 'nhc_sw3', 'nhc_sw6', 'nhc_dim']) {
+    for (const kind of ['nb_sw12', 'nb_sw4', 'nb_dim', 'nb_dim4', 'niko_dimmer', 'nb_pclink', 'nhc_cc', 'nhc_ps', 'nhc_rc', 'nhc_sw3', 'nhc_sw6', 'nhc_dim']) {
       const def = getDeviceDef(kind);
       expect(def?.source, kind).toMatch(/^https:\/\//);
       expect(def?.ref, kind).toBeTruthy();
@@ -246,5 +248,13 @@ describe('modules Niko sur bus', () => {
   it('les sorties survivent à la sauvegarde', () => {
     const [b] = parseBoards([{ id: 1, devices: [{ id: 2, kind: 'nb_sw4', row: 0, col: 0, outputs: ['A', 7, 'B'] }] }]);
     expect(b?.devices[0]?.outputs).toEqual(['A', 'B']);
+  });
+
+  it('le variateur 330-00700 est un appareil autonome, pas un module de bus', () => {
+    const rcd = dev('idiff', 0, 0);
+    const dimmer = dev('niko_dimmer', 0, 2);
+    const a = analyze(board([rcd, dimmer]));
+    expect(a.busModules).toHaveLength(0);
+    expect(a.groups[0]?.members.map((d) => d.id)).toEqual([dimmer.id]);
   });
 });
