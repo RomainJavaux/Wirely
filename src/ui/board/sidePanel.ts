@@ -70,6 +70,11 @@ export class BoardSidePanel {
     const circuit = isCircuitRole(def);
     const ref = a.refs.get(d.id);
     let h = `<h3>${esc(def.name)}${ref ? ` · ${esc(ref)}` : ''}</h3>`;
+    if (def.ref) {
+      const doc = def.source ? ` · <a href="${esc(def.source)}" target="_blank" rel="noopener">fiche</a>` : '';
+      h += `<p class="muted">Réf. <b>${esc(def.ref)}</b>${def.info ? ` · ${esc(def.info)}` : ''}${doc}</p>`;
+    }
+    if (def.unverified) h += `<p class="note-warn">⚠ ${esc(def.unverified)}</p>`;
 
     if (circuit || def.role === 'rcd' || def.role === 'feeder' || def.role === 'aux') {
       if (def.id !== 'vide') {
@@ -113,6 +118,13 @@ export class BoardSidePanel {
       h += `<p class="muted">Protégé par : ${rcd ? (rcd.id === d.id ? 'différentiel intégré' : `<b>${esc(a.refs.get(rcd.id) ?? '')}</b>`) : '<b>aucun différentiel</b>'}</p>`;
     }
 
+    if (def.outputs) {
+      const inputs = Array.from({ length: def.outputs }, (_, i) =>
+        `<label class="out"><span>${i + 1}</span><input type="text" data-out="${i}" value="${esc(d.outputs[i] ?? '')}" placeholder="Sortie ${i + 1}"></label>`,
+      ).join('');
+      h += `<label class="f">Sorties</label><div class="outs">${inputs}</div>`;
+    }
+
     if (def.id !== 'vide') {
       h += `<label class="f" for="dNote">Remarque</label><textarea id="dNote" rows="2">${esc(d.note)}</textarea>`;
     }
@@ -137,6 +149,17 @@ export class BoardSidePanel {
     text('#dLabel', 'label');
     text('#dDest', 'dest');
     text('#dNote', 'note');
+
+    this.el.querySelectorAll<HTMLInputElement>('[data-out]').forEach((input) => {
+      const i = Number(input.dataset.out);
+      input.oninput = () => {
+        const cur = store.activeBoard?.devices.find((x) => x.id === d.id);
+        const count = getDeviceDef(d.kind)?.outputs ?? 0;
+        const next = Array.from({ length: count }, (_, k) => (k === i ? input.value : (cur?.outputs[k] ?? '')));
+        live({ outputs: next });
+      };
+      input.onchange = () => store.commit();
+    });
 
     const choice = (id: string, apply: (value: string) => Partial<Device>) => {
       const select = q<HTMLSelectElement>(id);

@@ -36,7 +36,24 @@ export interface DeviceDef {
   defaultSensitivity?: number;
   diffTypes?: readonly DiffType[];
   defaultDiffType?: DiffType;
+
+  // --- Modules de domotique sur bus (Niko) -------------------------------------------
+  /** Système de bus : ces modules ne font pas partie des groupes protégés par un différentiel. */
+  system?: BusSystem;
+  /** Référence commerciale du constructeur. */
+  ref?: string;
+  /** Nombre de sorties nommables. */
+  outputs?: number;
+  /** Caractéristiques résumées (ex. « 12 sorties 10 A · 230 V »). */
+  info?: string;
+  /** Couleur d'accent de la face avant. */
+  tone?: string;
+  /** Fiche technique ayant servi à renseigner l'appareil. */
+  source?: string;
+  /** Renseigné quand une donnée (largeur…) n'est pas confirmée par une fiche constructeur. */
+  unverified?: string;
 }
+
 
 const modules = (n: number): Variant[] =>
   Array.from({ length: n }, (_, i) => ({ id: String(i + 1), label: `${i + 1} module${i ? 's' : ''}`, width: i + 1 }));
@@ -44,6 +61,19 @@ const modules = (n: number): Variant[] =>
 export const BREAKER_RATINGS = [2, 6, 10, 16, 20, 25, 32, 40, 50, 63] as const;
 const CURVES = ['B', 'C', 'D'] as const;
 const DIFF_TYPES = ['AC', 'A', 'F', 'HI'] as const;
+
+export type BusSystem = 'nikobus' | 'nhc2';
+
+export const BUS_SYSTEMS: Readonly<Record<BusSystem, { name: string; tone: string; busLabel: string }>> = {
+  nikobus: { name: 'Nikobus', tone: '#b45309', busLabel: 'Bus Nikobus · 9 Vdc' },
+  nhc2: { name: 'Niko Home Control II', tone: '#0f766e', busLabel: 'Bus NHC · 26 Vdc' },
+};
+
+/** Variante unique : un appareil de largeur fixe. */
+const fixed = (width: number): { variants: Variant[]; defaultVariant: string } => ({
+  variants: [{ id: String(width), label: `${width} modules`, width }],
+  defaultVariant: String(width),
+});
 
 export const DEVICES: readonly DeviceDef[] = [
   // --- Protection générale
@@ -169,6 +199,71 @@ export const DEVICES: readonly DeviceDef[] = [
     id: 'vide', category: 'Divers', name: 'Emplacement réservé', short: '',
     role: 'aux', refPrefix: '',
     variants: modules(6), defaultVariant: '1',
+  },
+
+  // --- Niko : Nikobus (ancienne génération), largeurs d'après les notices Niko
+  {
+    id: 'nb_pclink', category: 'Niko · Nikobus', name: 'PC-Link', short: 'PC-LINK',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-200', info: '230 V · programmation du bus',
+    tone: BUS_SYSTEMS.nikobus.tone, ...fixed(4),
+    source: 'https://www.manualslib.com/manual/1998334/Niko-05-200.html',
+  },
+  {
+    id: 'nb_sw12', category: 'Niko · Nikobus', name: 'Module de commutation 12 sorties', short: 'SW12',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-000-02', outputs: 12,
+    info: '12 sorties 10 A · 230 V · bus 9 Vdc', tone: BUS_SYSTEMS.nikobus.tone, ...fixed(14),
+    source: 'https://www.manualslib.com/manual/1852506/Niko-05-000-02.html',
+  },
+  {
+    id: 'nb_sw4', category: 'Niko · Nikobus', name: 'Module de commutation 4 sorties', short: 'SW4',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-002-02', outputs: 4,
+    info: '4 sorties 10 A · 230 V', tone: BUS_SYSTEMS.nikobus.tone, ...fixed(4),
+    source: 'https://www.manualslib.com/manual/2152109/Niko-05-002-02.html',
+  },
+  {
+    id: 'nb_shutter', category: 'Niko · Nikobus', name: 'Module volets roulants', short: 'VOLETS',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-001-02', info: 'commande de volets · 230 V',
+    tone: BUS_SYSTEMS.nikobus.tone, ...fixed(14),
+    source: 'https://www.niko.eu/en/article/05-001-02',
+    unverified: 'Largeur d’après un revendeur ; modèle arrêté par Niko en 2021. À vérifier sur l’appareil.',
+  },
+
+  // --- Niko : Niko Home Control II, largeurs d'après les fiches Niko
+  {
+    id: 'nhc_cc', category: 'Niko · Home Control II', name: 'Contrôleur connecté', short: 'NHC',
+    role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00003', info: '230 V · sortie bus 26 Vdc 400 mA',
+    tone: BUS_SYSTEMS.nhc2.tone, ...fixed(6),
+    source: 'https://www.niko.eu/article/550-00003',
+  },
+  {
+    id: 'nhc_ps', category: 'Niko · Home Control II', name: 'Alimentation', short: 'PSU',
+    role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00010', info: '26 Vdc · 10 W',
+    tone: BUS_SYSTEMS.nhc2.tone, ...fixed(4),
+    source: 'https://cdn.niko.eu/article/550-00010_fr-FR_datasheet.pdf',
+  },
+  {
+    id: 'nhc_rc', category: 'Niko · Home Control II', name: 'Accoupleur de rail', short: 'RC',
+    role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00020', info: 'prolonge alimentation et bus',
+    tone: BUS_SYSTEMS.nhc2.tone, ...fixed(2),
+    source: 'https://cdn.niko.eu/article/550-00020_fr-FR_datasheet.pdf',
+  },
+  {
+    id: 'nhc_sw3', category: 'Niko · Home Control II', name: 'Module de commutation 3 circuits', short: 'SW3',
+    role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00103', outputs: 3,
+    info: '3 sorties 16 A (40 A max. au total)', tone: BUS_SYSTEMS.nhc2.tone, ...fixed(2),
+    source: 'https://cdn.niko.eu/article/550-00103_fr-FR_datasheet.pdf',
+  },
+  {
+    id: 'nhc_sw6', category: 'Niko · Home Control II', name: 'Module de commutation 6 circuits', short: 'SW6',
+    role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00106', outputs: 6,
+    info: '6 sorties (32 A max. au total)', tone: BUS_SYSTEMS.nhc2.tone, ...fixed(4),
+    source: 'https://cdn.niko.eu/article/550-00106_fr-FR_datasheet.pdf',
+  },
+  {
+    id: 'nhc_dim', category: 'Niko · Home Control II', name: 'Variateur universel 2 × 400 W', short: 'DIM',
+    role: 'aux', refPrefix: 'NH', system: 'nhc2', ref: '550-00340', outputs: 2,
+    info: '2 sorties 400 W', tone: BUS_SYSTEMS.nhc2.tone, ...fixed(4),
+    source: 'https://www.niko.eu/en/article/550-00340',
   },
 ];
 

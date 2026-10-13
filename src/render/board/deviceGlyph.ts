@@ -13,6 +13,7 @@ const label = (x: number, y: number, s: string, size: number, fill = '#111', wei
 
 /** Couleur d'accent d'un appareil : bleu pour les différentiels, couleur d'usage pour les circuits. */
 export function deviceTone(device: Device, def: DeviceDef): string {
+  if (def.tone) return def.tone;
   if (def.role === 'rcd' || def.role === 'rcbo') return '#1d6fd6';
   if (isCircuitRole(def)) return USAGES[effectiveUsage(device)].color;
   return def.role === 'feeder' ? '#374151' : '#7b8794';
@@ -41,7 +42,33 @@ const testButton = (cx: number): string =>
   `<circle cx="${cx}" cy="72" r="4.5" fill="#fff" stroke="#1d6fd6" stroke-width="1.2"/>` +
   `<text x="${cx}" y="74.5" font-size="6.5" font-family="${FONT}" font-weight="700" text-anchor="middle" fill="#1d6fd6">T</text>`;
 
+/** Module de domotique sur bus : une LED numérotée par sortie, ou un afficheur sans sortie. */
+function busBody(def: DeviceDef, width: number, cx: number): string {
+  let s = label(cx, 27, def.short, width > MOD_W * 2 ? 12 : 10, '#1f2430');
+  if (def.ref) s += label(cx, 39, def.ref, 7.5, '#596070', 400);
+
+  const n = def.outputs ?? 0;
+  if (n > 0) {
+    const perRow = (width - 12) / n >= 18 ? n : Math.ceil(n / 2);
+    const cell = (width - 12) / perRow;
+    for (let i = 0; i < n; i++) {
+      const x = 7 + cell * ((i % perRow) + 0.5);
+      const y = 55 + Math.floor(i / perRow) * 16;
+      s +=
+        `<circle cx="${x}" cy="${y}" r="4.6" fill="#e5e7eb" stroke="#8d96a8" stroke-width=".9"/>` +
+        `<text x="${x}" y="${y + 2.3}" font-size="6" font-family="${FONT}" font-weight="700" text-anchor="middle" fill="#374151">${i + 1}</text>`;
+    }
+  } else {
+    s +=
+      `<rect x="8" y="50" width="${width - 14}" height="18" rx="2" fill="#2b303b"/>` +
+      `<text x="${cx}" y="62" font-size="7.5" font-family="${FONT}" font-weight="700" text-anchor="middle" fill="#9be7a4">BUS</text>`;
+  }
+  const system = def.system === 'nikobus' ? 'Nikobus' : 'NHC II';
+  return s + label(cx, 86, system, 7.5, '#596070', 400);
+}
+
 function auxBody(device: Device, def: DeviceDef, width: number, cx: number): string {
+  if (def.system) return busBody(def, width, cx);
   switch (def.id) {
     case 'voyant':
       return `<circle cx="${cx}" cy="46" r="10" fill="#7ddc8a" stroke="#3f8f4d" stroke-width="1.4"/>` + label(cx, 84, 'HL', 8, '#596070', 400);
@@ -115,5 +142,5 @@ export function deviceGlyph(device: Device, def: DeviceDef): string {
 /** Aperçu d'un appareil pour la palette (taille native). */
 export function devicePreview(def: DeviceDef, device: Device): string {
   const width = deviceWidth(device) * MOD_W;
-  return `<svg viewBox="0 0 ${width} ${DEV_H}" width="${Math.min(width, 72)}" height="${(Math.min(width, 72) * DEV_H) / width}" aria-hidden="true">${deviceGlyph(device, def)}</svg>`;
+  return `<svg viewBox="0 0 ${width} ${DEV_H}" width="${Math.min(width, 100)}" height="${(Math.min(width, 100) * DEV_H) / width}" aria-hidden="true">${deviceGlyph(device, def)}</svg>`;
 }

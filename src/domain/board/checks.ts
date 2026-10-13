@@ -1,5 +1,5 @@
 import { MAX_RATING_FOR_SECTION, getDeviceDef } from './catalog';
-import { analyze, deviceWidth, effectiveSection, isCircuitRole } from './layout';
+import { analyze, devicesInRow, deviceWidth, effectiveSection, isCircuitRole } from './layout';
 import type { Board } from './types';
 
 export type Severity = 'error' | 'warn' | 'info';
@@ -80,6 +80,15 @@ export function runChecks(board: Board): Check[] {
     }
   }
 
+  checks.push(...busChecks(board));
+
+  for (const d of board.devices) {
+    const def = getDeviceDef(d.kind);
+    if (def?.unverified) {
+      checks.push({ severity: 'info', deviceId: d.id, message: `${def.name} (${def.ref ?? ''}) : ${def.unverified}` });
+    }
+  }
+
   if (a.totalModules > 0 && board.devices.length > 0) {
     const free = a.totalModules - a.usedModules;
     if (free / a.totalModules < RESERVE_RATIO) {
@@ -91,4 +100,40 @@ export function runChecks(board: Board): Check[] {
   }
 
   return checks;
+}
+
+/** Modules qui doivent ouvrir un rail Niko Home Control (alimentation du bus). */
+const NHC_RAIL_START = new Set(['nhc_cc', 'nhc_ps', 'nhc_rc']);
+
+/**
+ * Règles de montage du bus Niko Home Control II, d'après les fiches Niko :
+ * un seul contrôleur connecté par installation, et une alimentation ou un accoupleur de rail
+ * à l'extrémité gauche de chaque rail portant des modules du bus.
+ */
+function busChecks(board: Board): Check[] {
+  const out: Check[] = [];
+  const nhc = board.devices.filter((d) => getDeviceDef(d.kind)?.system === 'nhc2');
+  if (nhc.length === 0) return out;
+
+  const controllers = nhc.filter((d) => d.kind === 'nhc_cc');
+  if (controllers.length === 0) {
+    out.push({ severity: 'info', message: 'Niko Home Control : aucun contrôleur connecté (un seul est nécessaire par installation).' });
+  }
+  for (const extra of controllers.slice(1)) {
+    out.push({ severity: 'warn', deviceId: extra.id, message: 'Niko Home Control : un seul contrôleur connecté par installation.' });
+  }
+
+  for (let row = 0; row < board.rows; row++) {
+    const inRow = devicesInRow(board, row);
+    if (!inRow.some((d) => getDeviceDef(d.kind)?.system === 'nhc2')) continue;
+    const first = inRow[0];
+    if (first && !NHC_RAIL_START.has(first.kind)) {
+      out.push({
+        severity: 'warn',
+        deviceId: first.id,
+        message: `Rail ${row + 1} : une alimentation ou un accoupleur de rail Niko doit être placé tout à gauche.`,
+      });
+    }
+  }
+  return out;
 }

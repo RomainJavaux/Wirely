@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { circuitRows, circuitsCsv, bomLines } from '../src/domain/board/bom';
+import { circuitRows, circuitsCsv, bomLines, outputRows } from '../src/domain/board/bom';
 import { getDeviceDef } from '../src/domain/board/catalog';
 import { runChecks } from '../src/domain/board/checks';
 import { analyze, canPlace, compactDevices, createDevice, deviceWidth, firstFreeSlot } from '../src/domain/board/layout';
@@ -174,5 +174,76 @@ describe('persistance', () => {
     expect(parseDoc({ name: 'a', items: [] }).boards).toEqual([]);
     const doc = parseDoc({ items: [], boards: [{ id: 40, devices: [{ id: 41, kind: 'disj', row: 0, col: 0 }] }] });
     expect(doc.nextId).toBeGreaterThan(41);
+  });
+});
+
+describe('modules Niko sur bus', () => {
+  it('utilise les largeurs des fiches constructeur', () => {
+    const width = (kind: string) => deviceWidth(dev(kind, 0, 0));
+    expect(width('nb_sw12')).toBe(14); // 05-000-02
+    expect(width('nb_sw4')).toBe(4); // 05-002-02
+    expect(width('nb_pclink')).toBe(4); // 05-200
+    expect(width('nhc_cc')).toBe(6); // 550-00003
+    expect(width('nhc_ps')).toBe(4); // 550-00010
+    expect(width('nhc_rc')).toBe(2); // 550-00020
+    expect(width('nhc_sw3')).toBe(2); // 550-00103
+    expect(width('nhc_sw6')).toBe(4); // 550-00106
+  });
+
+  it('chaque module du bus cite sa fiche, et les données incertaines sont signalées', () => {
+    for (const kind of ['nb_sw12', 'nb_sw4', 'nb_pclink', 'nhc_cc', 'nhc_ps', 'nhc_rc', 'nhc_sw3', 'nhc_sw6', 'nhc_dim']) {
+      const def = getDeviceDef(kind);
+      expect(def?.source, kind).toMatch(/^https:\/\//);
+      expect(def?.ref, kind).toBeTruthy();
+    }
+    expect(getDeviceDef('nb_shutter')?.unverified).toBeTruthy();
+  });
+
+  it('les modules du bus sont hors des groupes protégés par un différentiel', () => {
+    const sw = dev('nb_sw12', 0, 2);
+    const a = analyze(board([dev('idiff', 0, 0), sw]));
+    expect(a.busModules.map((d) => d.id)).toEqual([sw.id]);
+    expect(a.groups[0]?.members).toHaveLength(0);
+    expect(a.refs.get(sw.id)).toBe('NB1');
+  });
+
+  it('un module à plusieurs sorties se nomme sortie par sortie', () => {
+    const sw = dev('nhc_sw3', 0, 0, { outputs: ['Salon', '', 'Cuisine'] });
+    const rows = outputRows(board([sw]));
+    expect(rows.map((r) => r.output)).toEqual(['1', '2', '3']);
+    expect(rows.map((r) => r.label)).toEqual(['Salon', '', 'Cuisine']);
+  });
+
+  it('Home Control II : alimentation ou accoupleur obligatoire à gauche du rail', () => {
+    const bad = board([dev('nhc_sw3', 0, 0)]);
+    expect(runChecks(bad).some((c) => c.severity === 'warn' && c.message.includes('accoupleur'))).toBe(true);
+
+    const ok = board([dev('nhc_rc', 0, 0), dev('nhc_sw3', 0, 2)]);
+    expect(runChecks(ok).some((c) => c.message.includes('accoupleur'))).toBe(false);
+  });
+
+  it('Home Control II : un seul contrôleur connecté par installation', () => {
+    const two = board([dev('nhc_cc', 0, 0), dev('nhc_cc', 1, 0)]);
+    expect(runChecks(two).some((c) => c.message.includes('un seul contrôleur'))).toBe(true);
+    const none = board([dev('nhc_ps', 0, 0), dev('nhc_sw3', 0, 4)]);
+    expect(runChecks(none).some((c) => c.message.includes('aucun contrôleur'))).toBe(true);
+  });
+
+  it('Nikobus : aucune règle Home Control appliquée', () => {
+    const b = board([dev('nb_sw12', 0, 0)]);
+    expect(runChecks(b).some((c) => c.message.includes('Home Control'))).toBe(false);
+  });
+
+  it('la fiche inclut les sorties des modules', () => {
+    const doc = createDoc('Maison');
+    doc.boards.push(board([dev('nb_sw4', 0, 0, { outputs: ['Lustre', 'Applique'] })]));
+    const svg = buildBoardSheetSvg(doc, doc.boards[0] as Board, new Date('2026-01-01'));
+    expect(svg).toContain('Sorties des modules de commande');
+    expect(svg).toContain('Lustre');
+  });
+
+  it('les sorties survivent à la sauvegarde', () => {
+    const [b] = parseBoards([{ id: 1, devices: [{ id: 2, kind: 'nb_sw4', row: 0, col: 0, outputs: ['A', 7, 'B'] }] }]);
+    expect(b?.devices[0]?.outputs).toEqual(['A', 'B']);
   });
 });

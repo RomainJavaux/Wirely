@@ -19,6 +19,8 @@ export interface Device {
   label: string;
   /** Destination / pièce desservie. */
   dest: string;
+  /** Désignation de chaque sortie (modules de commande à plusieurs sorties). */
+  outputs: string[];
   rating: number | null;
   curve: Curve | null;
   /** Sensibilité différentielle en mA. */

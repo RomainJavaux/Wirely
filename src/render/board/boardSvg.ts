@@ -1,5 +1,5 @@
-import { getDeviceDef, type DeviceDef } from '../../domain/board/catalog';
-import { analyze, deviceWidth, type Analysis } from '../../domain/board/layout';
+import { BUS_SYSTEMS, getDeviceDef, type BusSystem, type DeviceDef } from '../../domain/board/catalog';
+import { analyze, devicesInRow, deviceWidth, type Analysis } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
 import { esc } from '../../util/escape';
 import { ACCENT } from '../items';
@@ -126,6 +126,27 @@ function combs(a: Analysis): string {
   return s;
 }
 
+/** Trait de bus (Nikobus, Niko Home Control) le long des modules d'un même système sur un rail. */
+function busLines(board: Board): string {
+  let s = '';
+  for (let row = 0; row < board.rows; row++) {
+    const bySystem = new Map<BusSystem, Device[]>();
+    for (const d of devicesInRow(board, row)) {
+      const system = getDeviceDef(d.kind)?.system;
+      if (system) bySystem.set(system, [...(bySystem.get(system) ?? []), d]);
+    }
+    for (const [system, devices] of bySystem) {
+      const x0 = slotX(Math.min(...devices.map((d) => d.col))) + 1;
+      const x1 = slotX(Math.max(...devices.map((d) => d.col + deviceWidth(d)))) - 1;
+      const y = deviceTop(row) - 5;
+      const { tone, busLabel } = BUS_SYSTEMS[system];
+      s += `<rect x="${x0}" y="${y}" width="${x1 - x0}" height="3" rx="1.5" fill="${tone}"/>`;
+      s += `<text x="${x1}" y="${y - 3}" font-size="8.5" font-family="${FONT}" font-weight="700" text-anchor="end" fill="${tone}">${esc(busLabel)}</text>`;
+    }
+  }
+  return s;
+}
+
 /** Face avant d'un tableau : enclos, rails, appareils, peignes par groupe et étiquettes. */
 export function renderBoard(board: Board, opts: BoardRenderOptions): RenderedBoard {
   const width = boardWidth(board);
@@ -156,6 +177,7 @@ export function renderBoard(board: Board, opts: BoardRenderOptions): RenderedBoa
   }
 
   s += combs(a);
+  s += busLines(board);
 
   for (const d of board.devices) {
     const def = getDeviceDef(d.kind);

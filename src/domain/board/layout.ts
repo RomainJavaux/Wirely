@@ -21,6 +21,7 @@ export function createDevice(def: DeviceDef, id: number, row: number, col: numbe
     col,
     label: '',
     dest: '',
+    outputs: [],
     rating: def.defaultRating ?? null,
     curve: def.defaultCurve ?? null,
     sensitivity: def.defaultSensitivity ?? null,
@@ -78,6 +79,8 @@ export interface Analysis {
   circuits: Device[];
   feeders: Device[];
   groups: Group[];
+  /** Modules de domotique sur bus : hors des groupes protégés par un différentiel. */
+  busModules: Device[];
   totalModules: number;
   usedModules: number;
 }
@@ -92,6 +95,7 @@ export function analyze(board: Board): Analysis {
   const circuits: Device[] = [];
   const feeders: Device[] = [];
   const groups: Group[] = [];
+  const busModules: Device[] = [];
   const counters = new Map<string, number>();
   let circuitNo = 0;
   let usedModules = 0;
@@ -118,6 +122,8 @@ export function analyze(board: Board): Analysis {
       } else if (def.role === 'rcd') {
         current = { head: d, members: [] };
         groups.push(current);
+      } else if (def.system) {
+        busModules.push(d);
       } else if (def.id !== 'vide') {
         if (!current) {
           current = { head: null, members: [] };
@@ -129,7 +135,7 @@ export function analyze(board: Board): Analysis {
       }
     }
   }
-  return { refs, protectedBy, circuits, feeders, groups, totalModules: board.rows * board.cols, usedModules };
+  return { refs, protectedBy, circuits, feeders, groups, busModules, totalModules: board.rows * board.cols, usedModules };
 }
 
 /** Aligne les appareils à gauche de chaque rail, en conservant leur ordre. */

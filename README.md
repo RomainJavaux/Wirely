@@ -10,6 +10,7 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
   différentiels, contacteurs…). Un différentiel protège les disjoncteurs à sa droite sur le
   rail ; l'app en déduit la structure et génère la documentation :
   face avant étiquetée, schéma unifilaire, repérage des circuits, nomenclature, CSV.
+  Modules de domotique **Niko** (Nikobus et Home Control II) avec sorties nommables et règles de bus.
   Les contrôles (section/calibre, différentiel amont, réserve de 20 %…) sont **indicatifs**
   et ne remplacent ni la norme ni un professionnel.
 
@@ -76,6 +77,9 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
 - **Rendu partagé** : `render/items.ts` produit le même SVG pour l'éditeur et l'export.
 - **Ajouter un symbole** : une ligne dans `domain/catalog.ts`.
 - **Ajouter un appareil de tableau** : une entrée dans `domain/board/catalog.ts` (largeur par variante, calibres, rôle).
+- **Ajouter un module Niko (ou autre bus)** : même fichier, avec `system`, `ref`, `outputs`, `info` et
+  `source` (lien vers la fiche constructeur). N'ajoutez une largeur que si elle figure dans une fiche ;
+  sinon renseignez `unverified`, qui l'affiche comme « à vérifier ».
 
 ## Format de fichier
 

@@ -8,6 +8,10 @@ export const fmtSection = (s: number): string => `${String(s).replace('.', ',')}
 export function deviceSpec(d: Device): string {
   const def = getDeviceDef(d.kind);
   if (!def) return d.kind;
+  if (def.ref) {
+    // Module du constructeur : la référence et ses caractéristiques suffisent.
+    return [`réf. ${def.ref}`, def.info].filter(Boolean).join(' · ');
+  }
   const parts: string[] = [];
   if (def.id !== 'vide' || d.variant !== '1') parts.push(variantOf(d).label);
   if (def.curves && d.curve && d.rating !== null) parts.push(`${d.curve}${d.rating}`);
@@ -83,4 +87,32 @@ export function circuitsCsv(board: Board): string {
     [r.ref, r.label, r.dest, r.device, r.protection, r.rcd, r.section, r.usage, r.note].map(csvCell).join(';'),
   );
   return '﻿' + [head.join(';'), ...rows].join('\r\n') + '\r\n';
+}
+
+export interface OutputRow {
+  ref: string;
+  module: string;
+  output: string;
+  label: string;
+  dest: string;
+}
+
+/** Sorties nommées des modules de commande (Nikobus, Niko Home Control…), module par module. */
+export function outputRows(board: Board): OutputRow[] {
+  const a = analyze(board);
+  const rows: OutputRow[] = [];
+  for (const d of a.busModules) {
+    const def = getDeviceDef(d.kind);
+    if (!def?.outputs) continue;
+    for (let i = 0; i < def.outputs; i++) {
+      rows.push({
+        ref: a.refs.get(d.id) ?? '',
+        module: `${def.name}${d.label.trim() ? ` · ${d.label.trim()}` : ''}`,
+        output: String(i + 1),
+        label: d.outputs[i]?.trim() ?? '',
+        dest: d.dest,
+      });
+    }
+  }
+  return rows;
 }

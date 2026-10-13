@@ -25,6 +25,7 @@ function parseDevice(raw: unknown): Device | null {
     col: Math.max(0, Math.round(r.col)),
     label: isStr(r.label) ? r.label : '',
     dest: isStr(r.dest) ? r.dest : '',
+    outputs: Array.isArray(r.outputs) ? r.outputs.filter(isStr).slice(0, 24) : [],
     rating: numOrNull(r.rating),
     curve: isStr(r.curve) && CURVES.includes(r.curve) ? (r.curve as Curve) : null,
     sensitivity: numOrNull(r.sensitivity),

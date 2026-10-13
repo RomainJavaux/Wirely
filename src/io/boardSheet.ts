@@ -1,5 +1,5 @@
 import { USAGES } from '../domain/board/catalog';
-import { bomLines, circuitRows, circuitsCsv } from '../domain/board/bom';
+import { bomLines, circuitRows, circuitsCsv, outputRows } from '../domain/board/bom';
 import { analyze, effectiveUsage } from '../domain/board/layout';
 import type { Board } from '../domain/board/types';
 import type { Doc } from '../domain/types';
@@ -99,6 +99,18 @@ export function buildBoardSections(board: Board): SheetSection[] {
       { title: 'Remarque', frac: 0.15, get: (r) => r.note },
     ], circuits);
     sections.push({ title: 'Repérage des circuits', svg: t.svg, width: 1200, height: t.height });
+  }
+
+  const outputs = outputRows(board);
+  if (outputs.length > 0) {
+    const t = table(1200, [
+      { title: 'Repère', frac: 0.08, get: (r) => r.ref },
+      { title: 'Module', frac: 0.32, get: (r) => r.module },
+      { title: 'Sortie', frac: 0.07, get: (r) => r.output },
+      { title: 'Désignation', frac: 0.33, get: (r) => r.label || '—' },
+      { title: 'Destination', frac: 0.2, get: (r) => r.dest },
+    ], outputs);
+    sections.push({ title: 'Sorties des modules de commande (bus)', svg: t.svg, width: 1200, height: t.height });
   }
 
   const bom = bomLines(board);
