@@ -43,3 +43,17 @@ tests/       Tests du domaine, du store et de l'export
 
 JSON : `{ name, nextId, items: [...] }`. Les fichiers sont validés et normalisés à
 l'ouverture (`parseDoc`) ; les anciens fichiers (`nid`) restent lisibles.
+
+## Déploiement (Hostinger, par git)
+
+L'hébergeur déploie les fichiers du dépôt sans lancer de build. Le build Vite est donc
+**commité dans `dist/`** et `.htaccess` sert ce dossier à la racine du site.
+
+À chaque modification du code, avant de commiter :
+
+```bash
+npm run build      # régénère dist/
+git add -A && git commit
+```
+
+Un `git push` suffit ensuite à publier.
