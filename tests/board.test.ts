@@ -183,7 +183,7 @@ describe('modules Niko sur bus', () => {
     expect(width('nb_sw12')).toBe(14); // 05-000-02
     expect(width('nb_sw4')).toBe(4); // 05-002-02
     expect(width('nb_pclink')).toBe(4); // 05-200
-    expect(width('nb_dim')).toBe(4); // 05-007-02, confirmé par l'utilisateur
+    expect(width('nb_dim')).toBe(14); // 05-007-02, fiche Cebeo : 14E
     expect(width('nhc_cc')).toBe(6); // 550-00003
     expect(width('nhc_ps')).toBe(4); // 550-00010
     expect(width('nhc_rc')).toBe(2); // 550-00020
@@ -192,7 +192,7 @@ describe('modules Niko sur bus', () => {
   });
 
   it('chaque module du bus cite sa fiche, et les données incertaines sont signalées', () => {
-    for (const kind of ['nb_sw12', 'nb_sw4', 'nb_pclink', 'nhc_cc', 'nhc_ps', 'nhc_rc', 'nhc_sw3', 'nhc_sw6', 'nhc_dim']) {
+    for (const kind of ['nb_sw12', 'nb_sw4', 'nb_dim', 'nb_pclink', 'nhc_cc', 'nhc_ps', 'nhc_rc', 'nhc_sw3', 'nhc_sw6', 'nhc_dim']) {
       const def = getDeviceDef(kind);
       expect(def?.source, kind).toMatch(/^https:\/\//);
       expect(def?.ref, kind).toBeTruthy();

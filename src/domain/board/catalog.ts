@@ -228,11 +228,10 @@ export const DEVICES: readonly DeviceDef[] = [
     unverified: 'Largeur d’après un revendeur ; modèle arrêté par Niko en 2021. À vérifier sur l’appareil.',
   },
   {
-    // Largeur (4 modules) confirmée par l'utilisateur sur son installation ; aucune autre donnée
-    // constructeur n'a pu être vérifiée, donc ni sorties ni calibre.
-    id: 'nb_dim', category: 'Niko · Nikobus', name: 'Dimcontroller', short: 'DIM',
-    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-007-02', info: 'variation',
-    tone: BUS_SYSTEMS.nikobus.tone, ...fixed(4),
+    id: 'nb_dim', category: 'Niko · Nikobus', name: 'Dimcontroller (acteur-variateur)', short: 'DIM',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-007-02', outputs: 12,
+    info: '12 sorties · 230 V AC', tone: BUS_SYSTEMS.nikobus.tone, ...fixed(14),
+    source: 'https://www.cebeo.be/catalog/fr-be/products/niko-nikobus-dimcontroller-230v-ac-largeur-14e-3458845',
   },
 
   // --- Niko : Niko Home Control II, largeurs d'après les fiches Niko
