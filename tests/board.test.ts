@@ -183,6 +183,7 @@ describe('modules Niko sur bus', () => {
     expect(width('nb_sw12')).toBe(14); // 05-000-02
     expect(width('nb_sw4')).toBe(4); // 05-002-02
     expect(width('nb_pclink')).toBe(4); // 05-200
+    expect(width('nb_dim')).toBe(4); // 05-007-02, confirmé par l'utilisateur
     expect(width('nhc_cc')).toBe(6); // 550-00003
     expect(width('nhc_ps')).toBe(4); // 550-00010
     expect(width('nhc_rc')).toBe(2); // 550-00020

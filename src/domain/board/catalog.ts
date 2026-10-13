@@ -227,6 +227,13 @@ export const DEVICES: readonly DeviceDef[] = [
     source: 'https://www.niko.eu/en/article/05-001-02',
     unverified: 'Largeur d’après un revendeur ; modèle arrêté par Niko en 2021. À vérifier sur l’appareil.',
   },
+  {
+    // Largeur (4 modules) confirmée par l'utilisateur sur son installation ; aucune autre donnée
+    // constructeur n'a pu être vérifiée, donc ni sorties ni calibre.
+    id: 'nb_dim', category: 'Niko · Nikobus', name: 'Dimcontroller', short: 'DIM',
+    role: 'aux', refPrefix: 'NB', system: 'nikobus', ref: '05-007-02', info: 'variation',
+    tone: BUS_SYSTEMS.nikobus.tone, ...fixed(4),
+  },
 
   // --- Niko : Niko Home Control II, largeurs d'après les fiches Niko
   {
