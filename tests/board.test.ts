@@ -260,8 +260,9 @@ describe('modules Niko sur bus', () => {
 });
 
 describe('calibres', () => {
-  it('l’interrupteur différentiel propose le calibre 32 A', () => {
+  it('l’interrupteur différentiel propose les calibres 16 A et 32 A', () => {
     const ratings = getDeviceDef('idiff')?.ratings ?? [];
+    expect(ratings).toContain(16);
     expect(ratings).toContain(32);
     expect([...ratings]).toEqual([...ratings].sort((a, b) => a - b));
   });
