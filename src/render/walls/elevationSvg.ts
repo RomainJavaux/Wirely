@@ -9,8 +9,10 @@ import { ACCENT } from '../items';
 export const K = 1.2;
 const ML = 58;
 const MR = 26;
-const MT = 40;
-const MB = 84;
+/** Marge haute : un titre dans le dessin pour l'export, presque rien dans l'éditeur (le tiroir a son titre). */
+const MT_EXPORT = 40;
+const MT_EDITOR = 24;
+const MB = 76;
 const FONT = 'Arial,sans-serif';
 
 export interface ElevationOptions {
@@ -49,6 +51,7 @@ export function renderElevation(
 ): ElevationScene {
   const lengthCm = faceLengthCm(doc, face);
   const ceilingCm = doc.ceiling;
+  const MT = o.interactive ? MT_EDITOR : MT_EXPORT;
   const wallW = lengthCm * K;
   const wallH = ceilingCm * K;
   const width = Math.round(ML + wallW + MR);
@@ -67,7 +70,9 @@ export function renderElevation(
   // Titre
   const all = roomFaces(room);
   const title = o.title ?? `${room.label.trim() || kind.name} · ${faceLabel(face, all)} · ${(lengthCm / 100).toFixed(2).replace('.', ',')} m`;
-  s += `<text x="${ML}" y="22" font-size="14" font-weight="700" font-family="${FONT}" fill="#1f2430">${esc(title)}</text>`;
+  if (!o.interactive) {
+    s += `<text x="${ML}" y="22" font-size="14" font-weight="700" font-family="${FONT}" fill="#1f2430">${esc(title)}</text>`;
+  }
 
   // Mur, sol et plafond
   const wallAttr = o.interactive ? ' data-wall="1"' : '';
@@ -93,7 +98,7 @@ export function renderElevation(
     s += `<line x1="${ML - 7}" y1="${y}" x2="${ML}" y2="${y}" stroke="#6b7385"/>`;
     s += `<text x="${ML - 10}" y="${y + 3.5}" font-size="10" font-family="${FONT}" text-anchor="end" fill="#6b7385">${v}</text>`;
   }
-  s += `<text x="${ML - 10}" y="${MT - 10}" font-size="10" font-family="${FONT}" text-anchor="end" fill="#6b7385">cm</text>`;
+  s += `<text x="${ML - 10}" y="${MT - 8}" font-size="10" font-family="${FONT}" text-anchor="end" fill="#6b7385">cm</text>`;
 
   const dim = (id: number, breaker: number | null): { dim: boolean; hot: boolean } => {
     void id;

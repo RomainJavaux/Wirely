@@ -3,45 +3,60 @@
 Éditeur de plans électriques (maison, pièce…) et configurateur de tableau électrique,
 avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
 
-## Quatre vues
+## À quoi ça sert
 
-- **Plan** : pièces typées (séjour, cuisine, chambre… avec leur couleur), murs, symboles
-  (prises, interrupteurs, lampes, ouvertures…) et câbles par circuit, à l'**échelle** réelle.
-  Surfaces, cotes et longueurs de câble sont calculées ; un panneau de synthèse et des contrôles
-  indicatifs par pièce (prises, point lumineux, détecteur de fumée) aident à la conception.
-  Chaque symbole peut porter un circuit du tableau et une hauteur de pose.
-  **Lien avec le tableau** : le symbole « tableau » du plan représente un tableau (double-clic pour
-  l'ouvrir) ; chaque câble ou appareil se raccorde à un **disjoncteur précis** (par identifiant, donc
-  indépendant du renumérotage). On choisit un *circuit actif* — ce qu'on dessine s'y raccorde et le
-  reste est atténué — ou on raccorde l'existant d'un clic avec l'outil *Affecter*.
-  Une pièce en L ou en U est **une seule pièce** : on fusionne des rectangles (une seule surface,
-  un seul nom, un contour unifié), et on peut détacher une partie ensuite.
-  Export : fiche avec plan coté et barre d'échelle, légende chiffrée, tableau des pièces et
-  nomenclature (PNG / SVG / PDF), plus CSV des pièces et de la nomenclature.
-- **Tableau** : rails DIN sur lesquels on pose des appareils modulaires (disjoncteurs,
-  différentiels, contacteurs…). Un différentiel protège les disjoncteurs à sa droite sur le
-  rail ; l'app en déduit la structure et génère la documentation :
-  face avant étiquetée, schéma unifilaire, repérage des circuits, nomenclature, CSV.
-  Modules de domotique **Niko** (Nikobus et Home Control II) avec sorties nommables et règles de bus.
-  Les contrôles (section/calibre, différentiel amont, réserve de 20 %…) sont **indicatifs**
-  et ne remplacent ni la norme ni un professionnel.
-  Du côté tableau : pastille sur chaque disjoncteur (nombre de lignes raccordées), section
-  « Derrière ce disjoncteur » (appareils, câbles, pièces desservies, accès direct au plan) et onglet
-  **Circuits** pour les gros tableaux : liste groupée par différentiel, recherche (nom, pièce,
-  repère, appareil…) qui met en retrait le reste de la face avant, défilement vers l'appareil.
-- **Murs** : pour chaque pièce, chaque mur est affiché **de face, vu de l'intérieur**, à l'échelle,
-  avec le quadrillage, la règle des hauteurs et les ouvertures. On pose les prises, interrupteurs,
-  appliques… en cliquant sur le mur, on les **glisse** (pas de 5 cm), ou on saisit la distance au coin
-  gauche ou droit et la **hauteur depuis le sol** ; les flèches déplacent au centimètre (Maj : 10 cm).
-  Un contrôle indicatif signale une prise au ras du sol ou une commande trop haute. Le plan reste la
-  source de vérité : déplacer un appareil sur le mur met à jour sa position sur le plan et sa
-  hauteur de pose (et inversement). La hauteur sous plafond est réglable (180–500 cm).
-- **3D** : maison en trois dimensions (Three.js, chargé à la première ouverture). Murs percés par les
-  portes et fenêtres, sols colorés par type de pièce, appareillage à sa vraie hauteur avec son
-  pictogramme, câbles au plafond. Coupe réglable des murs pour voir l'intérieur, vue du dessus, boussole,
-  **circuit en évidence** (le reste est atténué), clic sur un appareil pour ses détails et ses liens
-  vers le mur, le plan et le tableau.
-  La fiche exportée du plan contient les élévations des murs équipés.
+Wirely part des **pièces** et en déduit le reste : l'équipement conseillé, les circuits, le tableau,
+le métré, puis le dossier à remettre. On ne dessine pas des symboles un à un : on décrit, on
+ajuste, on exporte.
+
+### Quatre usages qui guident la conception
+
+1. **Préparer une rénovation ou une construction** (particulier, petit pro). On décrit les pièces
+   (type et dimensions), « Équiper les pièces » propose prises, lumières et commandes conformes aux
+   repères de la norme, on ajuste (positions et hauteurs sur chaque mur), « Générer le tableau »
+   regroupe les circuits, puis le **Dossier** donne le plan, la liste des points par pièce, les
+   murs cotés, les circuits et le matériel.
+2. **Documenter un tableau existant** (électricien devant le tableau). Pas besoin du plan :
+   **saisie rapide au clavier** (« ID 40 A type A », « 20 Lave-linge @ Cuisine »…), tableau et
+   étiquettes prêts en une minute, avec les pièces desservies.
+3. **Ajouter ou déplacer un point** dans une installation existante : un nouvel appareil se
+   raccorde de lui-même au circuit qui dessert déjà la pièce (s'il a de la place), « Raccorder
+   automatiquement » règle le reste, et chaque circuit montre ce qu'il alimente.
+4. **Remettre le dossier** : un aperçu exact du document exporté (PDF, PNG, SVG, CSV), la liste des
+   points à régler avant de le remettre, et un lien partageable.
+
+### Les quatre onglets
+
+- **Plan** — le poste de travail. Pièces (typées, à l'échelle, fusionnables en L ou en U), portes
+  et fenêtres, appareillage. Un panneau **Projet** dit où on en est et propose l'étape suivante.
+  Un appareil posé **s'accroche au mur** le plus proche (orienté vers la pièce, à sa hauteur
+  usuelle, avec un aperçu : mur, distance au coin, hauteur). Le **tiroir des murs** (bouton
+  « Murs ») montre le mur de la pièce sélectionnée de face, à l'échelle : on y glisse les appareils
+  (pas de 5 cm), ou on saisit la distance au coin et la hauteur dans le panneau de droite.
+  Le câblage à la main reste possible (« Câblage manuel ») mais n'est plus nécessaire.
+- **Tableau** — rails DIN, appareils modulaires, Niko (Nikobus, Home Control II). Face avant
+  étiquetée, unifilaire, repérage, nomenclature. Se génère depuis le plan, se saisit au clavier ou se
+  construit à la souris. Onglet **Circuits** pour les gros tableaux (recherche, groupes par
+  différentiel, accès au plan).
+- **3D** — la maison en volume (Three.js, chargé à la demande) : murs percés, appareillage à sa
+  vraie hauteur, circuit en évidence, coupe réglable.
+- **Dossier** — ce que l'on remet : sections au choix, points à régler, exports.
+
+### Ce que l'outil déduit (et ce qu'il ne fait pas)
+
+Tous les minimums et regroupements sont des **repères indicatifs** inspirés de la NF C 15-100 ; ils
+ne remplacent ni la norme ni un professionnel.
+
+- **Équipement conseillé** par type de pièce et par surface (prises, points lumineux, commandes,
+  RJ45, circuits spécialisés en cuisine, plan de travail à 110 cm, détecteur de fumée).
+- **Circuits** : éclairage (≤ 8 points, jour/nuit au-delà), prises par zone (≤ 5 prises en 16 A,
+  ≤ 8 en 20 A), un circuit par appareil spécialisé (plaque 32 A, lave-linge…), chauffage, chauffe-eau,
+  VMC, volets. **Différentiels** : un rail type A pour les spécialisés, l'éclairage séparé des prises
+  dans un grand logement, 8 circuits au plus par différentiel, 20 % de réserve.
+- **Câble** : estimation par circuit (tableau → appareils, descentes depuis le plafond, marge de
+  pose), regroupée par section dans le dossier. Un tracé dessiné à la main a priorité.
+- Pas de calcul de puissance, de chute de tension ni de sélectivité : c'est un outil de
+  documentation et de préparation, pas un logiciel de calcul.
 
 ## Lancer
 
@@ -81,10 +96,10 @@ Les dépendances vont toujours vers le bas : `ui` → `tools`/`render` → `core
 ```
 src/
   domain/    Modèle pur, sans DOM : types, géométrie, catalogue de symboles, validation
-    plan/    Plan : types de pièces, échelle et métriques, contrôles, exemple, exports CSV
+    plan/    Plan : types de pièces, échelle, besoins par pièce, équipement automatique, contrôles, exports CSV
     board/   Tableau électrique : appareils, placement sur rails, analyse, contrôles, nomenclature
-    link/    Lien plan <-> tableau : circuits, appareils raccordés, contrôles de raccordement
-    walls/   Murs : faces d'une pièce, hauteurs de pose, position sur un mur, contrôles
+    link/    Lien plan <-> tableau : circuits, appareils raccordés, circuits déduits du plan, estimation du câble
+    walls/   Murs : faces d'une pièce, hauteurs de pose, accrochage, position sur un mur, contrôles
     view3d/  Modèle 3D indépendant du moteur : boîtes (murs percés, sols), plaques, câbles
   core/      Store (état + historique annuler/rétablir), viewport, actions (plan et tableau)
   render/    Rendu SVG des éléments (partagé éditeur/export) et vue canevas
@@ -95,7 +110,7 @@ src/
   io/        Export (SVG/PNG/PDF/CSV), fiche du tableau, fichiers JSON, sauvegarde automatique
   ui/        Panneaux : barre du haut, palette, propriétés, raccourcis
     board/   Espace de travail du tableau : palette d'appareils, glisser-déposer, réglages
-    walls/   Espace de travail des murs : liste des faces, élévation éditable, panneau de réglage
+    walls/   Tiroir des murs (sous le plan) : élévation éditable, pose rapide
     view3d/  Espace de travail 3D : coupe, circuit en évidence, détails d'un appareil
   cloud/     Client d'API, authentification, synchronisation du projet ouvert (URL #/p/<id>)
   main.ts    Racine de composition

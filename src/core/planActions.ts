@@ -82,6 +82,12 @@ function applyEquip(store: Store, result: EquipResult): number {
 
 const nameOf = (kind: string): string => getSymbol(kind)?.name ?? kind;
 
+/** Rappel après un équipement : sans porte sur le plan, les interrupteurs sont posés dans un coin. */
+function doorTip(store: Store, byKind: Record<string, number>): string {
+  const hasDoors = store.state.doc.items.some((i) => i.type === 'symbol' && i.kind === 'porte');
+  return !hasDoors && (byKind.inter ?? 0) > 0 ? ' Les interrupteurs sont dans un coin : posez les portes puis déplacez-les.' : '';
+}
+
 /**
  * Équipe une pièce : ajoute les appareils qui manquent (ou seulement ceux d'un type, avec `only`).
  * Retourne le nombre de points ajoutés.
@@ -95,7 +101,7 @@ export function equipRoom(store: Store, roomId: number, only?: string): number {
   }
   store.commit();
   const warn = result.unplaced > 0 ? ` (${plural(result.unplaced, 'point')} sans place sur les murs)` : '';
-  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}${warn}.`, { undo: true });
+  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}${warn}.${doorTip(store, result.byKind)}`, { undo: true });
   return n;
 }
 
@@ -108,7 +114,7 @@ export function equipAll(store: Store): number {
     return 0;
   }
   store.commit();
-  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}.`, { undo: true });
+  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}.${doorTip(store, result.byKind)}`, { undo: true });
   return n;
 }
 

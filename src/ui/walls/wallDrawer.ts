@@ -63,6 +63,7 @@ export class WallDrawer {
   private readonly ceilingEl = qs<HTMLInputElement>('#wCeiling');
 
   constructor(private readonly store: Store) {
+    this.buildGrip();
     this.buildPalette();
     this.bindToolbar();
     this.bindCanvas();
@@ -72,6 +73,46 @@ export class WallDrawer {
     new ResizeObserver(() => {
       if (this.isOpen()) this.render();
     }).observe(this.scroll);
+  }
+
+  /** Poignée en haut du tiroir : on la glisse pour le hausser ou le baisser (la taille est retenue). */
+  private buildGrip(): void {
+    const KEY = 'wirely.wallDrawerHeight';
+    try {
+      const saved = Number(localStorage.getItem(KEY));
+      if (saved >= 200) this.drawer.style.height = `${saved}px`;
+    } catch {
+      // stockage indisponible : taille par défaut
+    }
+
+    const grip = document.createElement('div');
+    grip.className = 'grip';
+    grip.title = 'Glisser pour agrandir ou réduire';
+    this.drawer.prepend(grip);
+
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      grip.setPointerCapture(e.pointerId);
+      const startY = e.clientY;
+      const startH = this.drawer.getBoundingClientRect().height;
+      const max = (this.drawer.parentElement?.getBoundingClientRect().height ?? 700) - 150;
+      const move = (ev: PointerEvent): void => {
+        const h = clamp(startH + (startY - ev.clientY), 200, Math.max(220, max));
+        this.drawer.style.height = `${Math.round(h)}px`;
+        this.needFit = true;
+      };
+      const up = (): void => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        try {
+          localStorage.setItem(KEY, String(Math.round(this.drawer.getBoundingClientRect().height)));
+        } catch {
+          // sans importance
+        }
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+    });
   }
 
   private isOpen(): boolean {
@@ -122,7 +163,7 @@ export class WallDrawer {
 
   private buildPalette(): void {
     this.palette.innerHTML =
-      `<span class="muted">Poser sur ce mur :</span>` +
+      `<span class="pal-title">Poser sur ce mur</span>` +
       QUICK_KINDS.map((kind) => {
         const def = getSymbol(kind);
         if (!def) return '';

@@ -32,6 +32,7 @@ function steps(store: Store): Step[] {
   const missing = needs.reduce((t, n) => t + n.missing, 0);
   const electrical = doc.items.filter((i) => i.type === 'symbol' && isElectrical(i)).length;
   const unlinked = unlinkedItems(doc).symbols.length;
+  const hasDoors = doc.items.some((i) => i.type === 'symbol' && i.kind === 'porte');
   const boardChecks = doc.boards.flatMap((b) => runChecks(b));
   const errors = boardChecks.filter((c) => c.severity === 'error').length;
   const warns = boardChecks.filter((c) => c.severity === 'warn').length;
@@ -52,7 +53,9 @@ function steps(store: Store): Step[] {
     list.push({
       title: 'Équipement',
       state: 'todo',
-      text: `${plural(incomplete.length, 'pièce')} à compléter · ${plural(missing, 'point')} conseillé${missing > 1 ? 's' : ''}`,
+      text: `${plural(incomplete.length, 'pièce')} à compléter · ${plural(missing, 'point')} conseillé${missing > 1 ? 's' : ''}${
+        hasDoors ? '' : '. Posez d’abord les portes : les interrupteurs se placent à côté.'
+      }`,
       action: { id: 'equip', label: 'Équiper les pièces' },
     });
   }

@@ -55,6 +55,23 @@ describe('ajouter une pièce par ses dimensions', () => {
     expect(rc.y).toBe(ra.y + ra.h);
   });
 
+  it('passe à la rangée suivante quand la première est pleine', () => {
+    const store = new Store(createDoc('T'));
+    let last: number | null = null;
+    const ids: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      last = addRoomQuick(store, { kind: 'chambre', name: `Chambre ${i + 1}`, widthM: 4, depthM: 3, nearId: last });
+      ids.push(last as number);
+    }
+    const rooms = ids.map((id) => store.getItem(id) as Room);
+    // 13 m par rangée : trois chambres de 4 m, puis la rangée suivante repart de la gauche
+    expect(rooms.slice(0, 3).every((r) => r.y === 0)).toBe(true);
+    expect(rooms[3]!.x).toBe(0);
+    expect(rooms[3]!.y).toBeGreaterThanOrEqual(120);
+    expect(rooms[4]!.y).toBe(rooms[3]!.y);
+    expect(rooms[4]!.x).toBe(rooms[3]!.x + rooms[3]!.w);
+  });
+
   it('refuse des dimensions invalides', () => {
     const store = new Store(createDoc('T'));
     expect(addRoomQuick(store, { kind: 'autre', name: '', widthM: 0, depthM: 3 })).toBeNull();
