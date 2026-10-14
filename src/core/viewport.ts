@@ -3,6 +3,8 @@ import type { Point } from '../domain/types';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
+/** En dessous de cette taille (px), le cadrage n'a pas de sens. */
+const MIN_FIT_SIZE = 120;
 
 /** Transformation plan → écran (translation + zoom). Sans dépendance au DOM. */
 export class Viewport {
@@ -41,8 +43,13 @@ export class Viewport {
     this.notify();
   }
 
-  /** Cadre `bounds` dans une zone de width × height pixels (centré si null). */
+  /**
+   * Cadre `bounds` dans une zone de width × height pixels (centré si null).
+   * Sans effet si la zone est trop petite pour cadrer quoi que ce soit (canevas masqué ou
+   * pas encore mis en page) : on garde alors la vue courante au lieu de calculer une échelle absurde.
+   */
   fit(bounds: Rect | null, width: number, height: number): void {
+    if (width < MIN_FIT_SIZE || height < MIN_FIT_SIZE) return;
     if (!bounds) {
       this.k = 1;
       this.x = width / 2;
@@ -50,7 +57,7 @@ export class Viewport {
     } else {
       const bw = Math.max(1, bounds.x1 - bounds.x0);
       const bh = Math.max(1, bounds.y1 - bounds.y0);
-      this.k = Math.min(2, (width - 80) / bw, (height - 80) / bh);
+      this.k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(2, (width - 80) / bw, (height - 80) / bh)));
       this.x = (width - bw * this.k) / 2 - bounds.x0 * this.k;
       this.y = (height - bh * this.k) / 2 - bounds.y0 * this.k;
     }

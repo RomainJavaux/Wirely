@@ -440,3 +440,8 @@ aside input[type=number] { width: 100%; }
 .two > div { min-width: 0; }
 .chip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip i { margin-right: 0; }
+
+/* ---------- Marque ---------- */
+.brand { display: inline-flex; align-items: center; margin-right: 6px; line-height: 0; border-radius: 8px; }
+.brand img { height: 30px; width: auto; display: block; }
+.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

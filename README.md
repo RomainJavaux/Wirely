@@ -144,3 +144,18 @@ Le détail technique de l'erreur est dans `backend/storage/logs/laravel.log`.
 
 Les dépendances sont résolues pour **PHP 8.3** (`config.platform` dans `backend/composer.json`),
 ce qui garde l'application compatible avec les hébergements encore en 8.3.
+
+## Identité visuelle
+
+Le logo est dans `public/` (SVG, donc net à toutes les tailles) :
+
+| Fichier | Usage |
+|---|---|
+| `favicon.svg` | Pictogramme seul : onglet du navigateur, avatar |
+| `logo.svg` | Pictogramme + logotype, sur fond clair (en-tête de l'application) |
+| `logo-white.svg` | Même logo avec logotype blanc, pour fonds sombres |
+| `apple-touch-icon.png`, `icon-512.png` | Icônes d'écran d'accueil (générées depuis `favicon.svg`) |
+
+Couleurs : bleu `#3b82f6` → `#1e40af` (fond du pictogramme), orange `#f59e0b` (le nœud du fil),
+encre `#1f2430`. Le « W » du pictogramme est un fil électrique ; le point orange rappelle la
+couleur des circuits d'éclairage de l'application.

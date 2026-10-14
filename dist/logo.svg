@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 262 64" role="img" aria-label="Wirely">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1e40af"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Pictogramme -->
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <path d="M14 19 L23.5 45 L32 27 L40.5 45 L50 19" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="27" r="5" fill="#f59e0b" stroke="#fff" stroke-width="2.5"/>
+
+  <!-- Logotype : lettres tracées d'un seul trait, comme un fil -->
+  <g transform="translate(76 -4)">
+    <g fill="none" stroke="#1f2430" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 14 L20 48 L32 26 L44 48 L56 14"/>
+      <path d="M70 27 V48"/>
+      <path d="M84 27 V48 M84 37 C84 30 90 26.5 98 27.5"/>
+      <path d="M107 37 H129 A11 11 0 1 0 126.4 44.1"/>
+      <path d="M142 14 V48"/>
+      <path d="M153 27 L163 46 L173 27 M163 46 L158 58"/>
+    </g>
+    <circle cx="70" cy="14" r="3.8" fill="#f59e0b"/>
+  </g>
+</svg>
