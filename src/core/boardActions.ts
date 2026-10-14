@@ -10,9 +10,11 @@ import {
   MIN_COLS,
   minCols,
 } from '../domain/board/layout';
+import { applyQuickEntry, parseQuickEntry } from '../domain/board/quickEntry';
 import { buildBoard, type BoardTemplate } from '../domain/board/templates';
 import { clearBoardLinks, clearLinks } from '../domain/link/links';
 import type { Board, Device } from '../domain/board/types';
+import { notify } from './planActions';
 import type { Store } from './store';
 
 const MAX_ROWS = 8;
@@ -33,6 +35,29 @@ export function createBoard(store: Store, template: BoardTemplate): number {
   store.state.boardId = board.id;
   store.state.deviceSelection = null;
   store.commit();
+  return board.id;
+}
+
+/**
+ * Crée (ou complète) un tableau à partir d'une liste saisie au clavier : une ligne par appareil.
+ * Retourne l'identifiant du tableau, ou null si rien n'est exploitable.
+ */
+export function createBoardFromText(store: Store, text: string, opts: { append?: boolean } = {}): number | null {
+  const { lines } = parseQuickEntry(text);
+  if (!lines.some((l) => l.kind === 'breaker')) return null;
+  const doc = store.state.doc;
+
+  let board = opts.append ? store.activeBoard : undefined;
+  if (!board) {
+    board = buildBoard('empty', `Tableau ${doc.boards.length + 1}`, () => doc.nextId++);
+    board.rows = 1;
+    doc.boards.push(board);
+  }
+  const created = applyQuickEntry(board, lines, () => doc.nextId++);
+  store.state.boardId = board.id;
+  store.state.deviceSelection = null;
+  store.commit();
+  notify(store, `${created} circuit${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}.`, { undo: true });
   return board.id;
 }
 

@@ -2,9 +2,13 @@ import { WIRE_TYPES, getSymbol } from '../domain/catalog';
 import { GRID, unionBounds } from '../domain/geometry';
 import { planBomRows, planSubtitle, roomRows } from '../domain/plan/export';
 import { allLinks, circuitInfo, circuitOptions, circuitTitle, linksSummary } from '../domain/link/links';
+import { estimateCables } from '../domain/link/route';
 import { fmtLength, planSummary, roomsOf } from '../domain/plan/metrics';
+import { symbolsByRoom } from '../domain/plan/needs';
+import { getRoomKind } from '../domain/plan/roomKinds';
 import type { Doc } from '../domain/types';
-import { roomFaces, symbolsOnFace } from '../domain/walls/faces';
+import { faceLabel, faceOfSymbol, roomFaces, symbolsOnFace } from '../domain/walls/faces';
+import { effectiveHeight, isCeilingKind, isOpeningKind } from '../domain/walls/mounting';
 import { GLYPH_ATTRS, renderScene } from '../render/items';
 import { niceScaleBar } from '../render/scaleBar';
 import { renderElevation } from '../render/walls/elevationSvg';
@@ -36,6 +40,7 @@ function planSection(doc: Doc): SheetSection {
     scaleBar;
 
   return {
+    key: 'plan',
     title: 'Plan',
     svg: `<g transform="scale(${zoom})">${content}</g>`,
     width: Math.max(w, 360) * zoom,
@@ -86,7 +91,7 @@ function legendSection(doc: Doc): SheetSection | null {
     svg += `<text x="${colW - 40}" y="17" font-size="12.5" font-weight="700" font-family="${FONT}" text-anchor="end" fill="#111">${esc(c.value)}</text>`;
     svg += `<line x1="0" y1="${rowH - 2}" x2="${colW - 40}" y2="${rowH - 2}" stroke="#eceff4"/></g>`;
   });
-  return { title: 'Légende', svg, width: colW * 2, height: perCol * rowH };
+  return { key: 'legend', title: 'Légende', svg, width: colW * 2, height: perCol * rowH };
 }
 
 function roomsSection(doc: Doc): SheetSection | null {
@@ -106,7 +111,7 @@ function roomsSection(doc: Doc): SheetSection | null {
     ],
     rows,
   );
-  return { title: 'Pièces', svg: t.svg, width: 1200, height: t.height };
+  return { key: 'rooms', title: 'Pièces', svg: t.svg, width: 1200, height: t.height };
 }
 
 /** Ce qu'il y a derrière chaque disjoncteur : appareils, longueur de câble et pièces desservies. */
@@ -128,7 +133,7 @@ function circuitsSection(doc: Doc): SheetSection | null {
     ],
     rows,
   );
-  return { title: 'Circuits raccordés au plan', svg: t.svg, width: 1200, height: t.height };
+  return { key: 'circuits', title: 'Circuits raccordés au plan', svg: t.svg, width: 1200, height: t.height };
 }
 
 function materialsSection(doc: Doc): SheetSection | null {
@@ -145,7 +150,7 @@ function materialsSection(doc: Doc): SheetSection | null {
     ],
     rows,
   );
-  return { title: 'Nomenclature', svg: t.svg, width: 1200, height: t.height };
+  return { key: 'materials', title: 'Nomenclature', svg: t.svg, width: 1200, height: t.height };
 }
 
 const WALLS_WIDTH = 1200;
@@ -185,17 +190,110 @@ function wallsSection(doc: Doc): SheetSection | null {
     rowH = Math.max(rowH, c.height);
     widest = Math.max(widest, x - WALLS_GAP);
   }
-  return { title: 'Élévations des murs', svg, width: widest, height: y + rowH };
+  return { key: 'walls', title: 'Élévations des murs', svg, width: widest, height: y + rowH };
 }
 
-/** Sections de la fiche du plan : plan coté, légende chiffrée, pièces, murs, circuits, nomenclature. */
+interface PointRow {
+  room: string;
+  name: string;
+  label: string;
+  wall: string;
+  left: string;
+  height: string;
+  circuit: string;
+}
+
+/**
+ * Liste des points, pièce par pièce : chaque appareil avec son mur, sa distance au coin gauche, sa
+ * hauteur et son circuit. C'est le « cahier des points » que l'on remet à l'électricien.
+ */
+function pointsSection(doc: Doc): SheetSection | null {
+  const bySymbols = symbolsByRoom(doc);
+  const circuits = new Map(circuitOptions(doc).map((o) => [o.id, `${o.ref} · ${o.label}`] as const));
+  const rows: PointRow[] = [];
+
+  for (const room of roomsOf(doc.items).sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const roomName = room.label.trim() || getRoomKind(room.kind).name;
+    const faces = roomFaces(room);
+    const symbols = (bySymbols.get(room.id) ?? []).filter((s) => !isOpeningKind(s.kind) && s.kind !== 'tableau');
+    const placed = symbols.map((s) => {
+      const found = isCeilingKind(s.kind) ? null : faceOfSymbol(doc, s);
+      const p = found ? symbolsOnFace(doc, found.face).find((x) => x.item.id === s.id) : undefined;
+      return { s, found, u: p?.u ?? 0, order: found ? faces.findIndex((f) => f.key === found.face.key) : 99 };
+    });
+    placed.sort((a, b) => a.order - b.order || a.u - b.u);
+    for (const { s, found, u } of placed) {
+      rows.push({
+        room: roomName,
+        name: getSymbol(s.kind)?.name ?? s.kind,
+        label: s.label.trim(),
+        wall: isCeilingKind(s.kind) ? 'Plafond' : found ? faceLabel(found.face, faces) : '—',
+        left: found ? `${Math.round(u)} cm` : '',
+        height: isCeilingKind(s.kind) ? '' : `${Math.round(effectiveHeight(s))} cm`,
+        circuit: s.breaker !== null ? (circuits.get(s.breaker) ?? '') : '',
+      });
+    }
+  }
+  if (rows.length === 0) return null;
+
+  const t = table(
+    1200,
+    [
+      { title: 'Pièce', frac: 0.15, get: (r) => r.room },
+      { title: 'Appareil', frac: 0.2, get: (r) => r.name },
+      { title: 'Repère', frac: 0.15, get: (r) => r.label },
+      { title: 'Mur', frac: 0.12, get: (r) => r.wall },
+      { title: 'Du coin gauche', frac: 0.1, get: (r) => r.left },
+      { title: 'Hauteur', frac: 0.08, get: (r) => r.height },
+      { title: 'Circuit', frac: 0.2, get: (r) => r.circuit },
+    ],
+    rows,
+  );
+  return { key: 'points', title: 'Liste des points par pièce', svg: t.svg, width: 1200, height: t.height };
+}
+
+/** Câble à prévoir : tracés dessinés et estimation par circuit (tableau -> appareils, descentes comprises). */
+function cablesSection(doc: Doc): SheetSection | null {
+  interface Row {
+    name: string;
+    length: string;
+    detail: string;
+  }
+  const rows: Row[] = [];
+  for (const c of estimateCables(doc)) {
+    const section = String(c.section).replace('.', ',');
+    rows.push({
+      name: `Câble U-1000 R2V 3G${section} mm²`,
+      length: `≈ ${Math.ceil(c.length / 5) * 5} m`,
+      detail: `Estimation : ${c.circuits} circuit${c.circuits > 1 ? 's' : ''}, ${fmtLength(c.length)} avec descentes et marge de pose`,
+    });
+  }
+  for (const w of planSummary(doc).wires) {
+    rows.push({ name: WIRE_TYPES[w.type].name, length: fmtLength(w.length), detail: 'Tracé sur le plan' });
+  }
+  if (rows.length === 0) return null;
+  const t = table(
+    1200,
+    [
+      { title: 'Câble', frac: 0.35, get: (r) => r.name },
+      { title: 'Longueur', frac: 0.15, get: (r) => r.length },
+      { title: 'Origine', frac: 0.5, get: (r) => r.detail },
+    ],
+    rows,
+  );
+  return { key: 'cables', title: 'Câbles à prévoir', svg: t.svg, width: 1200, height: t.height };
+}
+
+/** Sections de la fiche du plan, dans l'ordre : plan, légende, pièces, points, murs, circuits, câbles, matériel. */
 export function buildPlanSections(doc: Doc): SheetSection[] {
   return [
     planSection(doc),
     legendSection(doc),
     roomsSection(doc),
+    pointsSection(doc),
     wallsSection(doc),
     circuitsSection(doc),
+    cablesSection(doc),
     materialsSection(doc),
   ].filter((s): s is SheetSection => s !== null);
 }

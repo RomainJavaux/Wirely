@@ -11,15 +11,18 @@ import type { ToolContext } from './tools/tool';
 import { ToolManager } from './tools/toolManager';
 import { BoardWorkspace } from './ui/board/boardWorkspace';
 import { CloudBar } from './ui/cloud/cloudBar';
+import { DossierWorkspace } from './ui/dossierWorkspace';
 import { ModeSwitch } from './ui/modeSwitch';
 import { qs } from './ui/dom';
 import { PropertiesPanel } from './ui/properties';
+import { RoomForm } from './ui/roomForm';
 import { installShortcuts } from './ui/shortcuts';
 import { Sidebar } from './ui/sidebar';
 import { Stage } from './ui/stage';
+import { Toast } from './ui/toast';
 import { Toolbar } from './ui/toolbar';
 import { View3dWorkspace } from './ui/view3d/view3dWorkspace';
-import { WallWorkspace } from './ui/walls/wallWorkspace';
+import { WallDrawer } from './ui/walls/wallDrawer';
 
 /** Racine de composition : assemble les couches, sans logique métier. */
 function bootstrap(): void {
@@ -53,7 +56,10 @@ function bootstrap(): void {
   const cloud = new Cloud(store, auth);
 
   new BoardWorkspace(store);
-  new WallWorkspace(store);
+  new WallDrawer(store);
+  new DossierWorkspace(store);
+  new RoomForm(store);
+  new Toast(store);
   new View3dWorkspace(store);
   new Sidebar(store);
   new CloudBar(auth, cloud);
@@ -62,6 +68,8 @@ function bootstrap(): void {
   installShortcuts(store, tools, canvas);
   // Le brouillon n'est gardé dans le navigateur que s'il n'est pas lié à un schéma en ligne.
   enableAutosave(store, () => cloud.savesLocally);
+
+  document.addEventListener('wirely:fit-plan', fit);
 
   fit();
   void cloud.start().then(fit);

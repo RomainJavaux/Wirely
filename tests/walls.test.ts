@@ -318,10 +318,11 @@ describe('contrôles d’un mur', () => {
 describe('navigation vers les murs et la 3D', () => {
   const r = room(1, 0, 0, 200, 100);
 
-  it('ouvre l’éditeur de murs sur la face et sélectionne l’appareil', () => {
+  it('ouvre le tiroir des murs sur la face et sélectionne l’appareil', () => {
     const store = new Store(docOf([r, sym(2, 'prise', 50, 0)]));
     expect(showItemOnWall(store, 2)).toBe(true);
-    expect(store.state.mode).toBe('walls');
+    expect(store.state.mode).toBe('plan');
+    expect(store.state.wallsOpen).toBe(true);
     expect(store.state.wallFace).toEqual({ roomId: 1, key: 'N0' });
     expect(store.state.selection).toBe(2);
   });
@@ -337,7 +338,8 @@ describe('navigation vers les murs et la 3D', () => {
   it('showWall choisit une face précise, showItemIn3D ouvre la vue 3D', () => {
     const store = new Store(docOf([r, sym(2, 'prise', 50, 0)]));
     showWall(store, 1, 'S0');
-    expect(store.state).toMatchObject({ mode: 'walls', wallFace: { roomId: 1, key: 'S0' }, selection: null });
+    // la pièce est sélectionnée : le tiroir et le panneau de droite suivent
+    expect(store.state).toMatchObject({ mode: 'plan', wallsOpen: true, wallFace: { roomId: 1, key: 'S0' }, selection: 1 });
     showItemIn3D(store, 2);
     expect(store.state).toMatchObject({ mode: 'view3d', selection: 2 });
   });

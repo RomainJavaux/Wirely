@@ -9,6 +9,8 @@ const MAX_CONTENT = 1200;
 const ROW_H = 22;
 
 export interface SheetSection {
+  /** Identifiant stable (choix des sections d'un dossier). */
+  key?: string;
   title: string;
   /** Contenu SVG de la section, dans son propre repère (origine en haut à gauche). */
   svg: string;

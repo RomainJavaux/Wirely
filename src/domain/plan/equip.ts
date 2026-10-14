@@ -250,8 +250,11 @@ class Equipper {
   }
 }
 
-/** Équipe les pièces demandées (dans l'ordre), en tenant compte de ce qui est déjà posé. */
-export function equipRooms(doc: Work, roomIds: readonly number[]): EquipResult {
+/**
+ * Équipe les pièces demandées (dans l'ordre), en tenant compte de ce qui est déjà posé.
+ * `only` limite l'ajout à un type d'appareil (« + 1 prise » dans une pièce).
+ */
+export function equipRooms(doc: Work, roomIds: readonly number[], only?: string): EquipResult {
   const eq = new Equipper(doc);
   const rooms = doc.items.filter((i): i is Room => i.type === 'room');
 
@@ -266,7 +269,7 @@ export function equipRooms(doc: Work, roomIds: readonly number[]): EquipResult {
         .filter((i): i is SymbolItem => i.type === 'symbol' && containsPoint(room, i.x, i.y))
         .map((i) => i.id),
     );
-    eq.room(room, report.needs, ids);
+    eq.room(room, only ? report.needs.filter((n) => n.kind === only) : report.needs, ids);
   }
   return { items: eq.out, byKind: eq.byKind, unplaced: eq.unplaced };
 }
@@ -342,10 +345,30 @@ function pickRoom(rooms: readonly Room[], order: readonly RoomKind[]): Room | un
   return rooms[0];
 }
 
-/** Libellé court d'un résultat : « 6 prises, 2 points lumineux, 1 interrupteur ». */
-export function describeEquip(byKind: Record<string, number>, names: (kind: string) => string): string {
-  const parts = Object.entries(byKind)
+/** Noms au singulier et au pluriel, pour les messages (« 6 prises 16 A, 2 points lumineux… »). */
+const COUNT_NAMES: Readonly<Record<string, [string, string]>> = {
+  prise: ['prise 16 A', 'prises 16 A'],
+  prise_s: ['prise spécialisée', 'prises spécialisées'],
+  rj45: ['prise RJ45', 'prises RJ45'],
+  tv: ['prise TV', 'prises TV'],
+  lampe: ['point lumineux', 'points lumineux'],
+  inter: ['interrupteur', 'interrupteurs'],
+  applique: ['applique', 'appliques'],
+  fumee: ['détecteur de fumée', 'détecteurs de fumée'],
+  tableau: ['tableau', 'tableaux'],
+};
+
+/**
+ * Libellé court d'un résultat : « 6 prises 16 A, 2 points lumineux, 1 interrupteur ».
+ * `fallback` donne le nom d'un type inconnu du tableau ci-dessus.
+ */
+export function describeEquip(byKind: Record<string, number>, fallback: (kind: string) => string): string {
+  return Object.entries(byKind)
     .filter(([, n]) => n > 0)
-    .map(([kind, n]) => `${n} ${names(kind).toLowerCase()}`);
-  return parts.join(', ');
+    .map(([kind, n]) => {
+      const names = COUNT_NAMES[kind];
+      const label = names ? names[n > 1 ? 1 : 0] : fallback(kind).toLowerCase();
+      return `${n} ${label}`;
+    })
+    .join(', ');
 }

@@ -1,42 +1,36 @@
-import { deleteSelection, detachRoomPart, duplicateSelection, rotateSelection, setTool, startMerge } from '../core/actions';
+import { deleteSelection, detachRoomPart, duplicateSelection, rotateSelection, startMerge } from '../core/actions';
 import {
+  assignBreaker,
   createLinkedBoard,
   linkSymbolToBoard,
   openBoard,
   showItemIn3D,
-  showItemOnWall,
   showWall,
 } from '../core/links';
-import {
-  circuitLinks,
-  circuitOptions,
-  circuitTitle,
-  isElectrical,
-  unlinkedItems,
-} from '../domain/link/links';
+import { equipRoom } from '../core/planActions';
 import type { Store } from '../core/store';
-import { WIRE_TYPES, WIRE_TYPE_IDS, SYMBOL_CATEGORIES, getSymbol } from '../domain/catalog';
-import { runPlanChecks } from '../domain/plan/checks';
-import {
-  fmtArea,
-  fmtLength,
-  fmtMeters,
-  planSummary,
-  polylineLength,
-  roomAt,
-  roomStats,
-  roomsOf,
-  toMeters,
-  toUnits,
-  wireLengthM,
-} from '../domain/plan/metrics';
+import { WIRE_TYPES, WIRE_TYPE_IDS, getSymbol } from '../domain/catalog';
+import { suggestCircuit } from '../domain/link/autoCircuits';
+import { circuitLinks, circuitOptions, circuitTitle, isElectrical } from '../domain/link/links';
+import { fmtArea, fmtLength, fmtMeters, polylineLength, roomAt, roomsOf, roomStats, toMeters, wireLengthM } from '../domain/plan/metrics';
+import { metersToRoomUnits } from '../domain/plan/layout';
+import { roomNeeds } from '../domain/plan/needs';
 import { ROOM_KINDS, ROOM_KIND_IDS, getRoomKind } from '../domain/plan/roomKinds';
-import type { Item, RoomKind, WireTypeId } from '../domain/types';
-import { faceLabel, faceLengthCm, faceOfSymbol, roomFaces, symbolsOnFace } from '../domain/walls/faces';
-import { effectiveHeight, isCeilingKind } from '../domain/walls/mounting';
+import type { Item, RoomKind, SymbolItem, WireTypeId } from '../domain/types';
+import {
+  faceLabel,
+  faceLengthCm,
+  faceOfSymbol,
+  moveAlongFace,
+  roomFaces,
+  symbolsOnFace,
+} from '../domain/walls/faces';
+import { effectiveHeight, isCeilingKind, mountingOf } from '../domain/walls/mounting';
+import { snapToWall } from '../domain/walls/snap';
 import { esc } from '../util/escape';
 import { bindBreakerField, breakerFieldHtml } from './breakerField';
 import { qs } from './dom';
+import { bindProject, projectHtml } from './projectPanel';
 
 const TITLES: Record<Item['type'], string> = {
   room: 'Pièce',
@@ -47,7 +41,7 @@ const TITLES: Record<Item['type'], string> = {
 };
 
 /** Hauteurs de pose courantes (cm), proposées en suggestion. */
-const HEIGHTS = [5, 30, 110, 120, 150, 220];
+const HEIGHTS = [5, 30, 110, 120, 150, 190, 220];
 
 const SHORTCUTS = `
   <details class="more">
@@ -61,16 +55,7 @@ const SHORTCUTS = `
     </p>
   </details>`;
 
-const CATEGORY_DOTS: Record<string, string> = {
-  Prises: '#d62828',
-  Commandes: '#111827',
-  Éclairage: '#e08a00',
-  Équipements: '#0e9aa7',
-  Distribution: '#7b2cbf',
-  Ouvertures: '#6b7385',
-};
-
-/** Panneau de droite : synthèse du plan, ou édition de l'élément sélectionné. */
+/** Panneau de droite : le projet (rien de sélectionné), ou l'élément sélectionné. */
 export class PropertiesPanel {
   private readonly el = qs<HTMLElement>('#props');
   private key = '';
@@ -97,95 +82,12 @@ export class PropertiesPanel {
 
     const item = this.store.selectedItem;
     if (!item) {
-      this.el.innerHTML = this.summary();
-      this.bindSummary();
+      this.el.innerHTML = projectHtml(this.store) + SHORTCUTS;
+      bindProject(this.el, this.store);
       return;
     }
     this.el.innerHTML = this.form(item);
     this.bindForm(item.id);
-  }
-
-  // ---------------------------------------------------------------- synthèse
-
-  private summary(): string {
-    const { doc } = this.store.state;
-    const s = planSummary(doc);
-    const checks = runPlanChecks(doc);
-    const total = s.byCategory.reduce((n, c) => n + c.count, 0);
-
-    if (doc.items.length === 0) return `<h3>Propriétés</h3><p class="muted">Dessinez une pièce ou chargez l'exemple pour commencer.</p>${SHORTCUTS}`;
-
-    const tiles = `
-      <div class="tiles">
-        <div class="tile"><b>${s.rooms}</b><span>pièce${s.rooms > 1 ? 's' : ''}</span></div>
-        <div class="tile"><b>${s.area.toFixed(1).replace('.', ',')}</b><span>m² habitables</span></div>
-        <div class="tile"><b>${total}</b><span>appareil${total > 1 ? 's' : ''}</span></div>
-      </div>`;
-
-    const cats = SYMBOL_CATEGORIES.filter((c) => s.byCategory.some((x) => x.category === c))
-      .map((c) => {
-        const n = s.byCategory.find((x) => x.category === c)?.count ?? 0;
-        return `<li><i style="background:${CATEGORY_DOTS[c] ?? '#6b7385'}"></i>${esc(c)}<b>${n}</b></li>`;
-      })
-      .join('');
-
-    const wires = WIRE_TYPE_IDS.filter((id) => s.wires.some((w) => w.type === id))
-      .map((id) => {
-        const w = WIRE_TYPES[id];
-        const len = s.wires.find((x) => x.type === id)?.length ?? 0;
-        return `<li><i class="wire" style="border-color:${w.color}${w.dash ? ';border-top-style:dashed' : ''}"></i>${esc(w.name)}<b>${fmtLength(len)}</b></li>`;
-      })
-      .join('');
-
-    // Raccordement au tableau : avancement, circuit actif et accès rapide à l'outil Affecter.
-    let wiring = '';
-    if (doc.boards.length > 0) {
-      const u = unlinkedItems(doc);
-      const electrical = doc.items.filter((i) => i.type === 'wire' || (i.type === 'symbol' && isElectrical(i))).length;
-      const done = electrical - u.wires.length - u.symbols.length;
-      const pct = electrical === 0 ? 0 : Math.round((done / electrical) * 100);
-      const activeId = this.store.state.activeCircuit;
-      const active = activeId !== null ? circuitOptions(doc).find((o) => o.id === activeId) : undefined;
-      wiring = `<h3>Raccordement au tableau</h3>
-        <div class="meter"><span style="width:${pct}%"></span></div>
-        <p class="muted">${done} / ${electrical} éléments raccordés (${pct} %)</p>
-        ${active ? `<p class="muted">Circuit actif : <b>${esc(circuitTitle(doc, active))}</b></p>` : ''}
-        <div class="row"><button type="button" id="sumAssign">🔗 Raccorder des éléments…</button></div>`;
-    }
-
-    const checkList =
-      s.rooms === 0
-        ? ''
-        : checks.length === 0
-          ? '<h3>Contrôles</h3><p class="ok">✔ Aucun point d’attention.</p>'
-          : `<h3>Contrôles <small>(indicatifs)</small></h3><ul class="checks">${checks
-              .map(
-                (c) =>
-                  `<li class="chk ${c.severity}" data-item="${c.itemId ?? ''}">${c.severity === 'warn' ? '⚠️' : 'ℹ️'} <span>${esc(c.message)}</span></li>`,
-              )
-              .join('')}</ul>
-            <p class="muted">Repères inspirés de la NF C 15-100 : ils ne remplacent ni la norme ni un professionnel.</p>`;
-
-    return `
-      <h3>Synthèse du plan</h3>
-      ${tiles}
-      ${cats ? `<h3>Appareillage</h3><ul class="legend">${cats}</ul>` : ''}
-      ${wires ? `<h3>Câbles <small>· ${fmtLength(s.wireLength)}</small></h3><ul class="legend">${wires}</ul>` : ''}
-      ${wiring}
-      ${s.wallLength > 0 ? `<p class="muted">Murs : ${fmtLength(s.wallLength)} linéaires.</p>` : ''}
-      ${checkList}
-      ${SHORTCUTS}`;
-  }
-
-  private bindSummary(): void {
-    const assign = this.el.querySelector<HTMLButtonElement>('#sumAssign');
-    if (assign) assign.onclick = () => setTool(this.store, 'assign');
-    this.el.querySelectorAll<HTMLElement>('[data-item]').forEach((li) => {
-      li.onclick = () => {
-        const id = Number(li.dataset.item);
-        if (li.dataset.item !== '' && Number.isFinite(id)) this.store.change((s) => (s.selection = id));
-      };
-    });
   }
 
   // ---------------------------------------------------------------- formulaire
@@ -195,7 +97,9 @@ export class PropertiesPanel {
     const { doc } = this.store.state;
     const linked = doc.boards.find((b) => b.id === boardId);
     const circuits = linked ? circuitOptions({ boards: [linked] }).length : 0;
-    const wired = linked ? [...new Set(linked.devices.map((d) => d.id))].filter((id) => circuitLinks(doc, id).symbols.length + circuitLinks(doc, id).wires.length > 0).length : 0;
+    const wired = linked
+      ? [...new Set(linked.devices.map((d) => d.id))].filter((id) => circuitLinks(doc, id).symbols.length + circuitLinks(doc, id).wires.length > 0).length
+      : 0;
     return `<label class="f" for="pBoard">Tableau représenté</label>
       <select id="pBoard">
         <option value="">— aucun —</option>
@@ -207,38 +111,84 @@ export class PropertiesPanel {
         <button type="button" id="pOpenBoard"${linked ? '' : ' disabled'}>Ouvrir le tableau ↗</button>
         <button type="button" id="pNewBoard">Créer un tableau</button>
       </div>
-      ${linked ? `<p class="muted"><b>${circuits}</b> circuit${circuits > 1 ? 's' : ''}, dont <b>${wired}</b> raccordé${wired > 1 ? 's' : ''} à des lignes du plan.</p>` : ''}`;
+      ${linked ? `<p class="muted"><b>${circuits}</b> circuit${circuits > 1 ? 's' : ''}, dont <b>${wired}</b> raccordé${wired > 1 ? 's' : ''} à des appareils du plan.</p>` : ''}`;
   }
 
-  /** Pour un symbole : position sur son mur, et accès à l'éditeur de murs et à la vue 3D. */
-  private wallLinks(id: number): string {
+  /** Circuit suggéré pour un appareil qui n'est raccordé à rien. */
+  private suggestion(item: SymbolItem): string {
     const { doc } = this.store.state;
-    const item = this.store.getItem(id);
-    if (item?.type !== 'symbol') return '';
-    const ceiling = isCeilingKind(item.kind);
-    const found = ceiling ? null : faceOfSymbol(doc, item);
-    let info: string;
-    if (ceiling) {
-      info = '<p class="muted">Appareil de plafond : visible dans la vue 3D.</p>';
-    } else if (found) {
-      const placed = symbolsOnFace(doc, found.face).find((p) => p.item.id === id);
-      const where = placed
-        ? `à <b>${Math.round(placed.u)} cm</b> du coin gauche, ${
-            placed.mounting.where === 'opening'
-              ? `allège <b>${Math.round(placed.v)} cm</b>`
-              : `à <b>${Math.round(effectiveHeight(item))} cm</b> du sol`
-          }`
-        : '';
-      const name = found.room.label.trim() || getRoomKind(found.room.kind).name;
-      info = `<p class="muted">${esc(faceLabel(found.face, roomFaces(found.room)))} · ${esc(name)}${where ? `<br>${where}` : ''}</p>`;
-    } else {
-      info = "<p class=\"muted\">Pas posé sur un mur : rapprochez-le d'un mur pour le régler en élévation.</p>";
+    if (item.breaker !== null || !isElectrical(item) || doc.boards.length === 0) return '';
+    const s = suggestCircuit(doc, item);
+    if (!s) {
+      return '<p class="muted">Aucun circuit existant ne convient : « Raccorder automatiquement » (panneau Projet) en crée un.</p>';
     }
-    return `<h3>Sur le mur</h3>${info}
-      <div class="row">
-        <button type="button" id="pWall"${found ? '' : ' disabled'} title="Régler la position et la hauteur sur le mur">Voir sur le mur ↗</button>
-        <button type="button" id="p3d" title="Voir dans la vue 3D">3D ↗</button>
-      </div>`;
+    const o = circuitOptions(doc).find((x) => x.id === s.deviceId);
+    if (!o) return '';
+    return `<div class="suggest"><span>Suggestion : <b>${esc(circuitTitle(doc, o))}</b><small>${esc(s.reason)}</small></span>
+      <button type="button" id="pSuggest">Raccorder</button></div>`;
+  }
+
+  /** Position d'un appareil sur son mur : distances au coin et hauteur, modifiables. */
+  private positionSection(item: SymbolItem): string {
+    const { doc } = this.store.state;
+    const mount = mountingOf(item.kind);
+    const room = roomAt(roomsOf(doc.items), item.x, item.y);
+    const roomName = room ? esc(room.label.trim() || getRoomKind(room.kind).name) : '';
+
+    if (isCeilingKind(item.kind)) {
+      return `<h3>Position</h3><p class="muted">Au plafond${roomName ? ` · <b>${roomName}</b>` : ''}. Visible dans la vue 3D.</p>`;
+    }
+
+    const found = faceOfSymbol(doc, item);
+    if (!found) {
+      return `<h3>Position</h3>
+        <p class="muted">${roomName ? `Dans <b>${roomName}</b>, ` : ''}pas posé sur un mur.</p>
+        <div class="row"><button type="button" id="pSnap">Accrocher au mur le plus proche</button></div>`;
+    }
+
+    const placed = symbolsOnFace(doc, found.face).find((p) => p.item.id === item.id);
+    const length = Math.round(faceLengthCm(doc, found.face));
+    const u = Math.round(placed?.u ?? 0);
+    const opening = mount.where === 'opening';
+    const label = faceLabel(found.face, roomFaces(found.room));
+    const name = esc(found.room.label.trim() || getRoomKind(found.room.kind).name);
+    const heightField =
+      item.kind === 'porte'
+        ? ''
+        : `<label class="f" for="pHeight">${opening ? 'Hauteur d’allège (cm)' : 'Hauteur depuis le sol (cm)'}</label>
+           <input type="number" id="pHeight" list="heightList" min="0" max="${doc.ceiling}" step="5" value="${item.height ?? ''}" placeholder="${Math.round(effectiveHeight(item))} (usuelle)">
+           <datalist id="heightList">${HEIGHTS.map((n) => `<option value="${n}">`).join('')}</datalist>`;
+    return `<h3>Sur le mur</h3>
+      <p class="muted">${esc(label)} · <b>${name}</b> · ${(length / 100).toFixed(2).replace('.', ',')} m</p>
+      <div class="two">
+        <div><label class="f" for="pU">Du coin gauche (cm)</label><input type="number" id="pU" min="0" max="${length}" step="5" value="${u}"></div>
+        <div><label class="f" for="pUr">Du coin droit (cm)</label><input type="number" id="pUr" min="0" max="${length}" step="5" value="${length - u}"></div>
+      </div>
+      ${heightField}`;
+  }
+
+  /** Pour une pièce : équipement conseillé et ce qui manque, avec l'ajout en un clic. */
+  private needsSection(roomId: number): string {
+    const report = roomNeeds(this.store.state.doc, roomId);
+    if (!report) return '';
+    if (report.required === 0) {
+      return `<h3>Équipement conseillé</h3><p class="muted">Choisissez un type de pièce pour obtenir l’équipement conseillé (prises, lumières, commandes).</p>`;
+    }
+    const rows = report.needs
+      .map((n) => {
+        const ok = n.missing === 0;
+        const extra = n.have > n.min ? ` <small>(+${n.have - n.min})</small>` : '';
+        return `<li class="need ${ok ? 'ok' : 'bad'}">
+          <span>${esc(n.label)}</span><b>${n.have} / ${n.min}${extra}</b>
+          ${ok ? '<i>✓</i>' : `<button type="button" data-need="${n.kind}">+ ${n.missing}</button>`}
+        </li>`;
+      })
+      .join('');
+    return `<h3>Équipement conseillé <small>(indicatif)</small></h3>
+      <ul class="needs">${rows}</ul>
+      <div class="row"><button type="button" id="pEquip" class="${report.complete ? '' : 'primary'}"${report.complete ? ' disabled' : ''}>${
+        report.complete ? '✓ Pièce équipée' : `Équiper la pièce (${report.missing} point${report.missing > 1 ? 's' : ''})`
+      }</button></div>`;
   }
 
   /** Pour une pièce : un bouton par mur, avec sa longueur. */
@@ -253,7 +203,8 @@ export class PropertiesPanel {
           (f) =>
             `<button type="button" data-face="${f.key}">${esc(faceLabel(f, faces))} <small>${(faceLengthCm(doc, f) / 100).toFixed(2).replace('.', ',')} m</small></button>`,
         )
-        .join('')}</div>`;
+        .join('')}</div>
+      <p class="muted">Pour régler la position et la hauteur de chaque appareil.</p>`;
   }
 
   private form(item: Item): string {
@@ -291,27 +242,15 @@ export class PropertiesPanel {
         <p class="muted">Surface${merged ? ' totale' : ''} : <b>${fmtArea(stats?.area ?? w * d)}</b></p>
         ${partsHtml}
         <div class="row"><button type="button" id="pMerge"${others ? '' : ' disabled'} title="Cliquez ensuite sur la pièce à fusionner dans celle-ci">Fusionner avec une autre pièce…</button></div>`;
-      if (stats) {
-        const min = kind.minSockets ? kind.minSockets(stats.area) : null;
-        const short = min !== null && stats.sockets < min;
-        h += `<ul class="legend">
-          <li><i style="background:#d62828"></i>Prises${min !== null ? ` <small>(${min} conseillées)</small>` : ''}<b class="${short ? 'bad' : ''}">${stats.sockets}</b></li>
-          <li><i style="background:#e08a00"></i>Points lumineux<b class="${kind.minLights > stats.lights ? 'bad' : ''}">${stats.lights}</b></li>
-          <li><i style="background:#111827"></i>Commandes<b>${stats.switches}</b></li>
-        </ul>`;
-      }
+      h += this.needsSection(item.id);
     }
 
     if (item.type === 'symbol') {
-      const room = roomAt(roomsOf(doc.items), item.x, item.y);
       h += `<label class="f" for="pLabel">Nom / repère</label>
         <input type="text" id="pLabel" value="${esc(item.label)}" placeholder="ex. Prise plan de travail">`;
-      if (isElectrical(item)) h += breakerFieldHtml(this.store, item.breaker);
+      if (isElectrical(item)) h += breakerFieldHtml(this.store, item.breaker) + this.suggestion(item);
       if (item.kind === 'tableau') h += this.boardField(item.board);
-      h += `<label class="f" for="pHeight">Hauteur de pose (cm)</label>
-        <input type="number" id="pHeight" list="heightList" min="0" max="400" step="5" value="${item.height ?? ''}" placeholder="—">
-        <datalist id="heightList">${HEIGHTS.map((n) => `<option value="${n}">`).join('')}</datalist>
-        <p class="muted">${room ? `Dans : <b>${esc(room.label.trim() || getRoomKind(room.kind).name)}</b>` : 'Hors de toute pièce'}</p>`;
+      h += this.positionSection(item);
     }
 
     if (item.type === 'wire') {
@@ -337,7 +276,12 @@ export class PropertiesPanel {
       <button id="pDup">Dupliquer</button>
       <button id="pDel" class="danger">Supprimer</button>
     </div>`;
-    if (item.type === 'symbol') h += this.wallLinks(item.id);
+    if (item.type === 'symbol') {
+      h += `<div class="row">
+        <button type="button" id="pWall"${isCeilingKind(item.kind) ? ' disabled' : ''} title="Afficher le mur sous le plan">Voir le mur ↗</button>
+        <button type="button" id="p3d" title="Voir dans la vue 3D">3D ↗</button>
+      </div>`;
+    }
     if (item.type === 'room') h += this.roomWalls(item.id);
     return h;
   }
@@ -369,13 +313,38 @@ export class PropertiesPanel {
     const boardSel = $<HTMLSelectElement>('#pBoard');
     if (boardSel) boardSel.onchange = () => linkSymbolToBoard(store, id, boardSel.value ? Number(boardSel.value) : null);
 
+    // Position sur le mur : distances au coin et hauteur.
+    const symbolNow = (): SymbolItem | null => {
+      const it = store.getItem(id);
+      return it?.type === 'symbol' ? it : null;
+    };
+    const moveTo = (uCm: number): void => {
+      const it = symbolNow();
+      if (!it || !Number.isFinite(uCm)) return;
+      const found = faceOfSymbol(store.state.doc, it);
+      if (!found) return;
+      const [x, y] = moveAlongFace(store.state.doc, found.face, it, uCm);
+      store.updateItem({ ...it, x, y });
+      store.commit();
+    };
+    const u = $<HTMLInputElement>('#pU');
+    if (u) u.onchange = () => moveTo(Number(u.value));
+    const ur = $<HTMLInputElement>('#pUr');
+    if (ur) {
+      ur.onchange = () => {
+        const it = symbolNow();
+        const found = it ? faceOfSymbol(store.state.doc, it) : null;
+        if (found) moveTo(faceLengthCm(store.state.doc, found.face) - Number(ur.value));
+      };
+    }
+
     const height = $<HTMLInputElement>('#pHeight');
     if (height) {
       height.oninput = () =>
         edit((i) => {
           if (i.type !== 'symbol') return i;
           const n = Number(height.value);
-          return { ...i, height: height.value === '' || !Number.isFinite(n) ? null : Math.min(400, Math.max(0, Math.round(n))) };
+          return { ...i, height: height.value === '' || !Number.isFinite(n) ? null : Math.min(store.state.doc.ceiling, Math.max(0, Math.round(n))) };
         });
       height.onchange = () => store.commit();
     }
@@ -401,7 +370,7 @@ export class PropertiesPanel {
       input.onchange = () => {
         const meters = Number(input.value);
         if (!Number.isFinite(meters) || meters <= 0) return;
-        const units = Math.max(20, Math.round(toUnits(store.state.doc.scale, meters) / 10) * 10);
+        const units = metersToRoomUnits(store.state.doc.scale, meters);
         edit((i) => (i.type === 'room' ? { ...i, [field]: units } : i));
         store.commit();
       };
@@ -414,7 +383,29 @@ export class PropertiesPanel {
       if (b) b.onclick = fn;
     };
     on('#pMerge', () => startMerge(store));
-    on('#pWall', () => showItemOnWall(store, id));
+    on('#pEquip', () => equipRoom(store, id));
+    this.el.querySelectorAll<HTMLButtonElement>('[data-need]').forEach((b) => {
+      b.onclick = () => equipRoom(store, id, b.dataset.need);
+    });
+    on('#pSuggest', () => {
+      const it = symbolNow();
+      const s = it ? suggestCircuit(store.state.doc, it) : null;
+      if (s) assignBreaker(store, id, s.deviceId);
+    });
+    on('#pSnap', () => {
+      const it = symbolNow();
+      if (!it) return;
+      const snap = snapToWall(store.state.doc, it.x, it.y, it.kind, 400);
+      if (!snap) return;
+      store.updateItem({ ...it, x: snap.x, y: snap.y, rot: snap.rot });
+      store.commit();
+    });
+    on('#pWall', () => {
+      const it = symbolNow();
+      const found = it ? faceOfSymbol(store.state.doc, it) : null;
+      if (found) showWall(store, found.room.id, found.face.key, id);
+      else store.change((s) => (s.wallsOpen = true));
+    });
     on('#p3d', () => showItemIn3D(store, id));
     on('#pOpenBoard', () => {
       const it = store.getItem(id);

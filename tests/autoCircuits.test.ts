@@ -91,13 +91,32 @@ describe('tableau généré', () => {
     return buildBoardFromPlan(planCircuits(docOf(flat())), 'Tableau principal', () => id++)!;
   };
 
-  it('un différentiel par groupe : spécialisés en type A, le reste en AC', () => {
+  it('un petit logement : deux différentiels, spécialisés en type A et le reste en AC', () => {
     const { board, circuits } = build();
     const rcds = board.devices.filter((d) => d.kind === 'idiff');
-    expect(rcds).toHaveLength(3);
+    expect(rcds).toHaveLength(2);
     expect(rcds[0]).toMatchObject({ diffType: 'A', sensitivity: 30, row: 0 });
-    expect(rcds.slice(1).every((d) => d.diffType === 'AC')).toBe(true);
+    expect(rcds[1]).toMatchObject({ diffType: 'AC', sensitivity: 30, row: 1 });
     expect(circuits.length).toBe(board.devices.filter((d) => d.kind === 'disj').length);
+  });
+
+  it('un grand logement : l’éclairage est séparé des prises, 8 circuits au plus par différentiel', () => {
+    const items: Item[] = [room(1, 'sejour', 0, 0, 400, 400), room(2, 'chambre', 400, 0, 400, 400), room(3, 'cuisine', 0, 400, 400, 400)];
+    let id = 10;
+    for (let i = 0; i < 12; i++) items.push(sym(id++, 'lampe', 20 + i * 10, 20 + (i % 2) * 400));
+    for (let i = 0; i < 56; i++) items.push(sym(id++, 'prise', 10 + ((i * 7) % 380), 100));
+    for (let i = 0; i < 4; i++) items.push(sym(id++, 'prise_s', 30 + i * 15, 300, ['Four', 'Lave-linge', 'Lave-vaisselle', 'Plaque de cuisson'][i]));
+    let next = 1000;
+    const gen = buildBoardFromPlan(planCircuits(docOf(items)), 'T', () => next++)!;
+    const a = analyze(gen.board);
+    expect(a.groups.length).toBeGreaterThanOrEqual(3);
+    for (const g of a.groups) {
+      const n = g.members.filter((m) => m.kind === 'disj').length;
+      expect(n).toBeLessThanOrEqual(8);
+      // un rail porte soit l'éclairage, soit les prises (jamais les deux)
+      const usages = new Set(g.members.map((m) => m.usage));
+      expect(usages.has('eclairage') && usages.has('prises')).toBe(false);
+    }
   });
 
   it('chaque circuit est derrière un différentiel, sans alerte bloquante', () => {

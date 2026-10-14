@@ -5,11 +5,11 @@ import { qs } from './dom';
 const MAINS: Readonly<Record<Mode, string>> = {
   plan: '#planMain',
   board: '#boardMain',
-  walls: '#wallsMain',
   view3d: '#view3dMain',
+  dossier: '#dossierMain',
 };
 
-/** Bascule entre le plan, le tableau, les murs et la vue 3D. */
+/** Bascule entre le plan, le tableau, la vue 3D et le dossier. */
 export class ModeSwitch {
   private readonly mains = (Object.keys(MAINS) as Mode[]).map((mode) => ({ mode, el: qs<HTMLElement>(MAINS[mode]) }));
   private readonly tabs = [...document.querySelectorAll<HTMLElement>('.tabs [data-mode]')];

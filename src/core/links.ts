@@ -127,12 +127,15 @@ export function startAssigning(store: Store, deviceId: number): void {
   });
 }
 
-/** Ouvre l'éditeur de murs sur une face de pièce (et y sélectionne un appareil, si demandé). */
+/** Ouvre le tiroir des murs sur une face de pièce (et y sélectionne un appareil, si demandé). */
 export function showWall(store: Store, roomId: number, faceKey: string, itemId: number | null = null): void {
   store.change((s) => {
-    s.mode = 'walls';
+    s.mode = 'plan';
+    s.wallsOpen = true;
     s.wallFace = { roomId, key: faceKey };
-    s.selection = itemId;
+    s.selection = itemId ?? roomId;
+    s.tool = 'select';
+    s.symbolKind = null;
     s.armedKind = null;
   });
 }

@@ -15,6 +15,7 @@ import { getDeviceDef } from '../../domain/board/catalog';
 import { MAX_COLS, MIN_COLS, canPlace, createDevice, deviceWidth, lastUsedRow, minCols } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
 import { linkSymbolToBoard, showItemOnPlan } from '../../core/links';
+import { generateBoard, notify } from '../../core/planActions';
 import { linkBadges, matchingDevices, symbolOfBoard, tableauSymbols } from '../../domain/link/links';
 import { roomAt, roomsOf } from '../../domain/plan/metrics';
 import { getRoomKind } from '../../domain/plan/roomKinds';
@@ -23,6 +24,7 @@ import { renderUnifilaire } from '../../render/board/unifilaire';
 import { esc } from '../../util/escape';
 import { isTyping, qs } from '../dom';
 import { DevicePalette } from './devicePalette';
+import { openQuickEntry } from './quickEntryDialog';
 import { BoardSidePanel } from './sidePanel';
 
 /** Largeurs de tableau courantes, proposées dans la liste. */
@@ -86,6 +88,13 @@ export class BoardWorkspace {
     };
     qs<HTMLButtonElement>('#bEmptyBlank').onclick = () => createBoard(store, 'empty');
     qs<HTMLButtonElement>('#bEmptyExample').onclick = () => createBoard(store, 'logement');
+    qs<HTMLButtonElement>('#bEmptyGenerate').onclick = () => {
+      if (generateBoard(store) === null) {
+        notify(store, 'Le plan ne contient pas encore d’appareils à raccorder : équipez d’abord les pièces (onglet Plan).');
+      }
+    };
+    qs<HTMLButtonElement>('#bEmptyQuick').onclick = () => openQuickEntry(store);
+    qs<HTMLButtonElement>('#bQuick').onclick = () => openQuickEntry(store);
 
     this.nameEl.oninput = () => patchBoard(store, { name: this.nameEl.value });
     this.nameEl.onchange = () => store.commit();

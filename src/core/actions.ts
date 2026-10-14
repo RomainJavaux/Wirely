@@ -36,7 +36,7 @@ export function addItem(store: Store, draft: NewItem): number {
   doc.items.push(item);
   store.state.selection = item.id;
   store.commit();
-  if (suggested) notify(store, `Raccordé au circuit « ${suggested} » (modifiable dans le panneau de droite).`);
+  if (suggested) notify(store, `Raccordé au circuit « ${suggested} » (modifiable dans le panneau de droite).`, { undo: true });
   return item.id;
 }
 

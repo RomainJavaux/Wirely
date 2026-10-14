@@ -32,6 +32,8 @@ export interface Tool {
   pointerDown(p: PointerInfo): void;
   pointerMove(p: PointerInfo): void;
   pointerUp(p: PointerInfo): void;
+  /** Le pointeur quitte le canevas (efface un aperçu). */
+  pointerLeave(): void;
   /** Termine le tracé en cours (double-clic, Entrée, clic droit). */
   finish(): void;
   /** Abandonne le tracé en cours. */
@@ -51,6 +53,7 @@ export abstract class BaseTool implements Tool {
   pointerDown(_p: PointerInfo): void {}
   pointerMove(_p: PointerInfo): void {}
   pointerUp(_p: PointerInfo): void {}
+  pointerLeave(): void {}
   finish(): void {}
   cancel(): void {}
   hasDraft(): boolean {

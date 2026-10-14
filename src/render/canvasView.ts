@@ -40,6 +40,7 @@ export class CanvasView {
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e));
     svg.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    svg.addEventListener('pointerleave', () => this.tools.active.pointerLeave());
     svg.addEventListener('dblclick', (e) => {
       this.tools.active.finish();
       // Double-clic sur le symbole d'un tableau lié : on ouvre le tableau.
@@ -51,6 +52,8 @@ export class CanvasView {
     svg.addEventListener('contextmenu', (e) => e.preventDefault());
     svg.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     window.addEventListener('resize', () => this.render());
+    // Le tiroir des murs change la hauteur du canevas : on le redessine.
+    new ResizeObserver(() => this.render()).observe(svg);
   }
 
   /** Taille du canevas en pixels. */

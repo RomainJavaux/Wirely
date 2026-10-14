@@ -16,10 +16,10 @@ import type { Store } from './store';
 
 let noticeSeq = 0;
 
-/** Affiche un message bref (bandeau en bas de l'écran). */
-export function notify(store: Store, text: string): void {
+/** Affiche un message bref (bandeau en bas de l'écran), avec « Annuler » pour une action validée. */
+export function notify(store: Store, text: string, opts: { undo?: boolean } = {}): void {
   store.change((s) => {
-    s.notice = { seq: ++noticeSeq, text };
+    s.notice = { seq: ++noticeSeq, text, undo: opts.undo ?? false };
   });
 }
 
@@ -82,9 +82,12 @@ function applyEquip(store: Store, result: EquipResult): number {
 
 const nameOf = (kind: string): string => getSymbol(kind)?.name ?? kind;
 
-/** Équipe une pièce : ajoute les appareils qui manquent. Retourne le nombre de points ajoutés. */
-export function equipRoom(store: Store, roomId: number): number {
-  const result = equipRooms(store.state.doc, [roomId]);
+/**
+ * Équipe une pièce : ajoute les appareils qui manquent (ou seulement ceux d'un type, avec `only`).
+ * Retourne le nombre de points ajoutés.
+ */
+export function equipRoom(store: Store, roomId: number, only?: string): number {
+  const result = equipRooms(store.state.doc, [roomId], only);
   const n = applyEquip(store, result);
   if (n === 0) {
     notify(store, result.unplaced > 0 ? 'Plus de place sur les murs de cette pièce.' : 'Cette pièce a déjà l’équipement conseillé.');
@@ -92,7 +95,7 @@ export function equipRoom(store: Store, roomId: number): number {
   }
   store.commit();
   const warn = result.unplaced > 0 ? ` (${plural(result.unplaced, 'point')} sans place sur les murs)` : '';
-  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}${warn}.`);
+  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}${warn}.`, { undo: true });
   return n;
 }
 
@@ -105,7 +108,7 @@ export function equipAll(store: Store): number {
     return 0;
   }
   store.commit();
-  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}.`);
+  notify(store, `Ajouté : ${describeEquip(result.byKind, nameOf)}.`, { undo: true });
   return n;
 }
 
@@ -124,7 +127,7 @@ export function alignToWalls(store: Store): number {
     return m && i.type === 'symbol' ? { ...i, x: m.x, y: m.y, rot: m.rot } : i;
   });
   store.commit();
-  notify(store, `${plural(moves.size, 'appareil recalé', 'appareils recalés')} sur les murs.`);
+  notify(store, `${plural(moves.size, 'appareil recalé', 'appareils recalés')} sur les murs.`, { undo: true });
   return moves.size;
 }
 
@@ -170,7 +173,7 @@ export function generateBoard(store: Store): BoardReport | null {
   store.state.boardId = gen.board.id;
   store.state.deviceSelection = null;
   store.commit();
-  notify(store, `Tableau généré : ${plural(gen.circuits.length, 'circuit')} sur ${plural(gen.board.rows, 'rail')}.`);
+  notify(store, `Tableau généré : ${plural(gen.circuits.length, 'circuit')} sur ${plural(gen.board.rows, 'rail')}.`, { undo: true });
   return { circuits: gen.circuits.length, rails: gen.board.rows, boardId: gen.board.id };
 }
 
@@ -227,7 +230,7 @@ export function connectUnlinked(store: Store): ConnectReport {
   const parts: string[] = [];
   if (report.assigned) parts.push(`${plural(report.assigned, 'appareil raccordé', 'appareils raccordés')} à des circuits existants`);
   if (report.created) parts.push(plural(report.created, 'nouveau circuit'));
-  notify(store, `${parts.join(' et ')}.`);
+  notify(store, `${parts.join(' et ')}.`, { undo: true });
   return report;
 }
 

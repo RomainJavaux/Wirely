@@ -12,6 +12,8 @@ import { qs } from './dom';
 /** Panneau de gauche : outils, types de câble et palette de symboles. */
 export class Sidebar {
   private readonly toolsEl = qs<HTMLElement>('#tools');
+  private readonly wiringToolsEl = qs<HTMLElement>('#wiringTools');
+  private readonly openingsEl = qs<HTMLElement>('#openings');
   private readonly wiresEl = qs<HTMLElement>('#wireTypes');
   private readonly paletteEl = qs<HTMLElement>('#palette');
   private readonly viewEl = qs<HTMLElement>('#viewOpts');
@@ -31,13 +33,18 @@ export class Sidebar {
   }
 
   private buildTools(): void {
-    this.toolsEl.innerHTML = TOOLS_META.filter((t) => t.inToolbar)
-      .map((t) => `<button data-tool="${t.id}" title="${(t.key ?? '').toUpperCase()}">${esc(t.label)}</button>`)
-      .join('');
-    this.toolsEl.addEventListener('click', (e) => {
+    const html = (wiring: boolean): string =>
+      TOOLS_META.filter((t) => t.inToolbar && Boolean(t.wiring) === wiring)
+        .map((t) => `<button data-tool="${t.id}" title="${(t.key ?? '').toUpperCase()}">${esc(t.label)}</button>`)
+        .join('');
+    this.toolsEl.innerHTML = html(false);
+    this.wiringToolsEl.innerHTML = html(true);
+    const onClick = (e: Event): void => {
       const id = (e.target as Element).closest<HTMLElement>('[data-tool]')?.dataset.tool;
       if (id) setTool(this.store, id as Parameters<typeof setTool>[1]);
-    });
+    };
+    this.toolsEl.addEventListener('click', onClick);
+    this.wiringToolsEl.addEventListener('click', onClick);
   }
 
   private buildWireTypes(): void {
@@ -62,23 +69,26 @@ export class Sidebar {
   }
 
   private buildPalette(): void {
-    this.paletteEl.innerHTML = SYMBOL_CATEGORIES.map((cat) => {
-      const buttons = SYMBOLS.filter((s) => s.category === cat)
-        .map(
-          (s) =>
-            `<button data-sym="${s.id}" title="${esc(s.name)}"><svg viewBox="${s.viewBox ?? '-18 -18 36 36'}" ${GLYPH_ATTRS}>${s.svg}</svg>${esc(s.name)}</button>`,
-        )
-        .join('');
-      const count = SYMBOLS.filter((s) => s.category === cat).length;
-      return (
-        `<details class="cat"><summary><span>${esc(cat)}</span><span class="count">${count}</span></summary>` +
-        `<div class="palette">${buttons}</div></details>`
-      );
-    }).join('');
-    this.paletteEl.addEventListener('click', (e) => {
+    const button = (s: (typeof SYMBOLS)[number]): string =>
+      `<button data-sym="${s.id}" title="${esc(s.name)}"><svg viewBox="${s.viewBox ?? '-18 -18 36 36'}" ${GLYPH_ATTRS}>${s.svg}</svg>${esc(s.name)}</button>`;
+
+    // Les portes et fenêtres sont toujours visibles ; le reste est rangé par catégorie, repliée.
+    this.openingsEl.innerHTML = SYMBOLS.filter((s) => s.category === 'Ouvertures').map(button).join('');
+    this.paletteEl.innerHTML = SYMBOL_CATEGORIES.filter((cat) => cat !== 'Ouvertures')
+      .map((cat) => {
+        const list = SYMBOLS.filter((s) => s.category === cat);
+        return (
+          `<details class="cat"><summary><span>${esc(cat)}</span><span class="count">${list.length}</span></summary>` +
+          `<div class="palette">${list.map(button).join('')}</div></details>`
+        );
+      })
+      .join('');
+    const onClick = (e: Event): void => {
       const kind = (e.target as Element).closest<HTMLElement>('[data-sym]')?.dataset.sym;
       if (kind) setTool(this.store, 'symbol', kind);
-    });
+    };
+    this.paletteEl.addEventListener('click', onClick);
+    this.openingsEl.addEventListener('click', onClick);
   }
 
   /** Cases à cocher : ce que le plan montre (n'affecte pas les exports). */
@@ -178,14 +188,16 @@ export class Sidebar {
     });
     const scale = this.scaleEl.querySelector<HTMLInputElement>('#scaleInput');
     if (scale && document.activeElement !== scale) scale.value = String(doc.scale);
-    this.toolsEl.querySelectorAll<HTMLElement>('[data-tool]').forEach((b) =>
-      b.classList.toggle('active', b.dataset.tool === tool),
-    );
+    for (const group of [this.toolsEl, this.wiringToolsEl]) {
+      group.querySelectorAll<HTMLElement>('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+    }
     this.wiresEl.querySelectorAll<HTMLElement>('[data-wire]').forEach((b) =>
       b.classList.toggle('active', b.dataset.wire === wireType),
     );
-    this.paletteEl.querySelectorAll<HTMLElement>('[data-sym]').forEach((b) =>
-      b.classList.toggle('active', tool === 'symbol' && b.dataset.sym === symbolKind),
-    );
+    for (const group of [this.paletteEl, this.openingsEl]) {
+      group.querySelectorAll<HTMLElement>('[data-sym]').forEach((b) =>
+        b.classList.toggle('active', tool === 'symbol' && b.dataset.sym === symbolKind),
+      );
+    }
   }
 }

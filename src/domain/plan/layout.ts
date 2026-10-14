@@ -26,9 +26,12 @@ export interface RoomSpot {
   h: number;
 }
 
-/** Les mesures de pièces sont des multiples de 10 unités (comme la saisie des dimensions). */
+/** Largeur d'une rangée de pièces avant de passer à la suivante (m). */
+export const MAX_ROW_METERS = 13;
+
+/** Les mesures de pièces sont des multiples de 2 unités, soit 5 cm à l'échelle par défaut. */
 export const metersToRoomUnits = (scale: number, meters: number): number =>
-  Math.max(20, Math.round(toUnits(scale, meters) / 10) * 10);
+  Math.max(20, Math.round(toUnits(scale, meters) / 2) * 2);
 
 const overlaps = (a: RoomSpot, b: { x: number; y: number; w: number; h: number }): boolean =>
   a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
@@ -38,14 +41,30 @@ const overlaps = (a: RoomSpot, b: { x: number; y: number; w: number; h: number }
  * puis au-dessus de la dernière pièce, puis des précédentes), sans recouvrement. La première pièce
  * est posée à l'origine.
  */
-export function findRoomSpot(doc: Pick<Doc, 'items'>, w: number, h: number, near?: Room): RoomSpot {
+export function findRoomSpot(
+  doc: Pick<Doc, 'items'> & Partial<Pick<Doc, 'scale'>>,
+  w: number,
+  h: number,
+  near?: Room,
+): RoomSpot {
   const rooms = doc.items.filter((i): i is Room => i.type === 'room');
   if (rooms.length === 0) return { x: 0, y: 0, w, h };
 
   const rects = rooms.flatMap((r) => roomRects(r));
   const free = (s: RoomSpot): boolean => !rects.some((r) => overlaps(s, r));
+  const left = Math.min(...rects.map((r) => r.x));
+  const bottom = Math.max(...rects.map((r) => r.y + r.h));
+  const maxRow = doc.scale !== undefined ? toUnits(doc.scale, MAX_ROW_METERS) : Infinity;
 
   const ordered = near ? [near, ...[...rooms].reverse().filter((r) => r.id !== near.id)] : [...rooms].reverse();
+
+  // Une rangée trop large : on repart à gauche, sous les pièces existantes (comme un étage qu'on remplit).
+  const first = ordered[0];
+  if (first && first.x + first.w + w - left > maxRow) {
+    const row: RoomSpot = { x: left, y: bottom, w, h };
+    if (free(row)) return row;
+  }
+
   for (const r of ordered) {
     const candidates: RoomSpot[] = [
       { x: r.x + r.w, y: r.y, w, h },

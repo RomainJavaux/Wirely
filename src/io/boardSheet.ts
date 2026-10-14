@@ -34,6 +34,7 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
   const front = renderBoard(board, { interactive: false });
   const legend = usageLegend(board);
   sections.push({
+    key: 'front',
     title: 'Face avant',
     svg: front.svg + (legend ? `<g transform="translate(44 ${front.height + 14})">${legend}</g>` : ''),
     width: front.width,
@@ -43,7 +44,7 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
   const a = analyze(board);
   if (a.groups.length > 0 || a.busModules.length > 0) {
     const uni = renderUnifilaire(board);
-    sections.push({ title: 'Schéma unifilaire', ...uni });
+    sections.push({ key: 'uni', title: 'Schéma unifilaire', ...uni });
   }
 
   const circuits = circuitRows(board, wiredText(doc));
@@ -59,7 +60,7 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
       { title: 'Raccordé au plan', frac: 0.18, get: (r) => r.wired },
       { title: 'Remarque', frac: 0.06, get: (r) => r.note },
     ], circuits);
-    sections.push({ title: 'Repérage des circuits', svg: t.svg, width: 1200, height: t.height });
+    sections.push({ key: 'circuits', title: 'Repérage des circuits', svg: t.svg, width: 1200, height: t.height });
   }
 
   const outputs = outputRows(board);
@@ -71,7 +72,7 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
       { title: 'Désignation', frac: 0.33, get: (r) => r.label || '—' },
       { title: 'Destination', frac: 0.2, get: (r) => r.dest },
     ], outputs);
-    sections.push({ title: 'Sorties des modules de commande (bus)', svg: t.svg, width: 1200, height: t.height });
+    sections.push({ key: 'outputs', title: 'Sorties des modules de commande (bus)', svg: t.svg, width: 1200, height: t.height });
   }
 
   const bom = bomLines(board);
@@ -85,6 +86,7 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
     const total = bom.reduce((s, l) => s + l.qty, 0);
     const modules = bom.reduce((s, l) => s + l.modules, 0);
     sections.push({
+      key: 'bom',
       title: `Nomenclature · ${total} appareil${total > 1 ? 's' : ''}, ${modules} modules`,
       svg: t.svg,
       width: 1200,

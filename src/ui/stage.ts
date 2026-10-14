@@ -28,6 +28,7 @@ export class Stage {
     qs<HTMLButtonElement>('#exampleBtn').onclick = () => {
       if (loadExamplePlan(this.store)) fit();
     };
+    qs<HTMLButtonElement>('#startOpen').onclick = () => qs<HTMLInputElement>('#fileIn').click();
 
     store.subscribe(() => this.sync());
     viewport.subscribe(() => this.syncScaleBar());

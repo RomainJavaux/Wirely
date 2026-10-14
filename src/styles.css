@@ -103,7 +103,8 @@ h3:first-child { margin-top: 0; }
 .wires button { display: flex; align-items: center; gap: 8px; text-align: left; }
 .wires i { display: inline-block; width: 26px; height: 0; border-top: 3px solid; }
 
-#stage { flex: 1; position: relative; min-width: 0; background: #fff; }
+#stage { flex: 1; position: relative; min-width: 0; min-height: 0; background: #fff; display: flex; flex-direction: column; }
+#canvasWrap { flex: 1; position: relative; min-height: 0; }
 #svg { width: 100%; height: 100%; display: block; touch-action: none; }
 
 #hint {
@@ -523,18 +524,37 @@ ul.items { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2p
 ul.items li { padding: 4px 8px; border-radius: 6px; cursor: pointer; }
 ul.items li:hover { background: #f1f4f9; }
 
-/* ---------- Murs : élévations et pose de l'appareillage ---------- */
-#wallsStage { flex: 1; position: relative; min-width: 0; display: flex; flex-direction: column; background: #eef1f6; }
+/* ---------- Tiroir des murs (sous le plan) ---------- */
+#wallDrawer {
+  flex: none;
+  height: 42%;
+  min-height: 250px;
+  max-height: 460px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #eef1f6;
+  border-top: 2px solid var(--line);
+  box-shadow: 0 -6px 18px rgba(31, 36, 48, .06);
+}
+#wallDrawer[hidden] { display: none; }
 #wallsBar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
 }
-#wallsTitle { font-size: 14px; min-width: 150px; text-align: center; }
+#wallsTitle { font-size: 14px; }
+#wallsFaces { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+#wallsFaces button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; font-size: 12.5px; border-radius: 6px; margin: 0; }
+#wallsFaces button small { color: var(--muted); font-size: 11px; }
+#wallsFaces button b { background: #eef1f6; border-radius: 999px; padding: 0 6px; font-size: 11px; }
+#wallsFaces button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+#wallsFaces button.active b { background: #fff; }
+
 label.inl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 label.inl input[type=number] { width: 72px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
 
@@ -542,71 +562,166 @@ label.inl input[type=number] { width: 72px; padding: 5px 6px; border: 1px solid 
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 5px 10px;
   background: #fafbfd;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
+  flex: none;
 }
-#wallsPalette .qk { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px; font-size: 12px; white-space: nowrap; }
-#wallsPalette .qk svg { width: 24px; height: 24px; flex: none; }
+#wallsPalette .qk { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; font-size: 12px; white-space: nowrap; }
+#wallsPalette .qk svg { width: 22px; height: 22px; flex: none; }
 
-#wallsScroll { flex: 1; overflow: auto; padding: 20px; }
-#wallsHost { width: max-content; margin: 0 auto; background: #fff; border-radius: 10px; box-shadow: 0 6px 18px rgba(31, 36, 48, .14); padding: 6px; }
+#wallsScroll { flex: 1; min-height: 0; overflow: auto; padding: 10px; }
+#wallsHost { width: max-content; margin: 0 auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 14px rgba(31, 36, 48, .12); padding: 4px; }
 #wallsHost svg { display: block; user-select: none; touch-action: none; }
-.walls-empty { padding: 28px 30px; max-width: 420px; text-align: center; color: var(--muted); }
-.walls-empty h2 { margin: 0 0 6px; color: var(--text); font-size: 18px; }
+.walls-empty { padding: 20px 26px; max-width: 420px; text-align: center; color: var(--muted); }
 
 #wallsHint {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 10px;
+  bottom: 8px;
   background: rgba(31, 36, 48, .88);
   color: #fff;
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: 12px;
   pointer-events: none;
-  max-width: 70%;
+  max-width: 75%;
 }
 
-aside.wide { width: 290px; }
+.drawer-toggle { position: absolute; right: 12px; top: 12px; box-shadow: 0 2px 8px rgba(31, 36, 48, .12); }
 
-/* liste des pièces et de leurs murs */
-#wallsList details.room { border-bottom: 1px solid var(--line); padding: 2px 0; }
-#wallsList details.room > summary {
+aside.wide { width: 290px; }
+.wallbtns button small { color: var(--muted); }
+
+/* ---------- Départ, formulaire de pièce, panneau Projet ---------- */
+button.wide { width: 100%; }
+button.active.primary { background: #1d4fd0; }
+.roomform {
+  margin-top: 8px;
+  padding: 10px;
+  background: #f6f8fb;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.roomform .row { margin-top: 8px; }
+.roomform input[type=text], .roomform select, .roomform input[type=number] { width: 100%; }
+
+.start { max-width: 640px !important; }
+.start p { margin: 0 0 14px; color: var(--muted); }
+.start-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 12px;
+  line-height: 1.3;
+  height: 100%;
+}
+.card span { color: var(--muted); font-size: 12.5px; }
+.card.primary span { color: #dbe7ff; }
+
+details.adv { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.adv > summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+li.step { display: flex; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+li.step.off { opacity: .55; }
+li.step.done { background: #f3faf5; border-color: #cfe8d6; }
+li.step.warn { background: #fff8ec; border-color: #f1d9a8; }
+.step-dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: #e8ecf3;
+  color: var(--muted);
+}
+li.step.done .step-dot { background: #1f9d55; color: #fff; }
+li.step.warn .step-dot { background: #d98a00; color: #fff; }
+li.step.todo .step-dot { background: var(--accent); color: #fff; }
+.step-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.step-body small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.step-btn { margin-top: 6px; align-self: flex-start; font-size: 12.5px; padding: 4px 10px; }
+
+ul.roomlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+ul.roomlist li { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+ul.roomlist li:hover { background: #f1f4f9; }
+ul.roomlist i { width: 12px; height: 12px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .15); flex: none; }
+.rl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ul.roomlist small { color: var(--muted); }
+.rl-badge { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: #eef1f6; }
+.rl-badge.ok { background: #dff3e6; color: #15803d; }
+.rl-badge.bad { background: #fde7e7; color: var(--danger); }
+
+ul.needs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+li.need { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+li.need span { flex: 1; }
+li.need b { font-variant-numeric: tabular-nums; }
+li.need.bad b { color: var(--danger); }
+li.need.ok i { color: #15803d; font-style: normal; width: 36px; text-align: center; }
+li.need button { padding: 2px 8px; font-size: 12px; min-width: 36px; }
+
+.suggest {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  list-style: none;
-  padding: 7px 2px;
-  font-weight: 600;
-}
-#wallsList details.room > summary::-webkit-details-marker { display: none; }
-#wallsList details.room > summary i { width: 12px; height: 12px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .15); flex: none; }
-#wallsList details.room > summary small { margin-left: auto; color: var(--muted); font-weight: 400; }
-#wallsList .faces { display: grid; gap: 4px; padding: 0 0 8px 20px; }
-#wallsList .face {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  align-items: center;
-  text-align: left;
-  padding: 5px 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #eef4ff;
+  border: 1px solid #c9dafc;
+  border-radius: 10px;
   font-size: 12.5px;
 }
-#wallsList .face small { color: var(--muted); }
-#wallsList .face b { min-width: 20px; text-align: center; background: #eef1f6; border-radius: 999px; padding: 0 6px; font-size: 11px; }
-#wallsList .face.active { background: var(--accent-soft); border-color: var(--accent); }
-#wallsList .face.active b { background: #fff; }
+.suggest span { flex: 1; display: flex; flex-direction: column; }
+.suggest small { color: var(--muted); }
 
-/* tableau des appareils du mur */
-table.items-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 6px 0 8px; }
-table.items-table th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 4px 4px; border-bottom: 1px solid var(--line); }
-table.items-table td { padding: 5px 4px; border-bottom: 1px solid #eef1f6; }
-table.items-table tbody tr { cursor: pointer; }
-table.items-table tbody tr:hover { background: #f1f4f9; }
-.wallbtns button small { color: var(--muted); }
+.stack { display: grid; gap: 6px; }
+.row.tight { margin-top: 0; }
+.row.tight > button { flex: 1; }
+
+/* ---------- Bandeau de confirmation ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(640px, 92vw);
+  padding: 10px 14px;
+  background: #1f2430;
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  font-size: 13.5px;
+}
+.toast[hidden] { display: none; }
+.toast button { background: transparent; border-color: rgba(255, 255, 255, .45); color: #fff; padding: 3px 10px; }
+.toast button:hover:not(:disabled) { background: rgba(255, 255, 255, .14); }
+.toast button.x { border: 0; padding: 2px 6px; opacity: .7; }
+
+/* ---------- Dossier ---------- */
+#dossierStage { flex: 1; min-width: 0; overflow: auto; background: #eef1f6; padding: 24px; }
+#dossierSheet {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(31, 36, 48, .14);
+}
+#dossierSheet svg { display: block; width: 100%; height: auto; border-radius: 10px; }
+.dossier-empty { padding: 60px 24px; text-align: center; color: var(--muted); }
+#dossierOptions { width: 290px; }
 
 /* ---------- Vue 3D ---------- */
 #view3dStage { flex: 1; position: relative; min-width: 0; background: #eef1f6; overflow: hidden; }
@@ -648,3 +763,9 @@ table.items-table tbody tr:hover { background: #f1f4f9; }
 input[type=range] { width: 100%; }
 .chk-line { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
 .chk-line small { color: var(--muted); }
+
+/* ---------- Saisie rapide du tableau ---------- */
+dialog.quick { width: min(560px, calc(100vw - 32px)); }
+dialog.quick textarea { width: 100%; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; margin: 6px 0; }
+.dlg-title { margin: 0 0 4px; }
+.board-empty .stack { max-width: 360px; margin: 0 auto; }

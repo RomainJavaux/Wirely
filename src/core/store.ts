@@ -21,6 +21,8 @@ export interface BoardFocus {
 export interface Notice {
   seq: number;
   text: string;
+  /** Propose « Annuler » (l'action vient d'être validée dans l'historique). */
+  undo: boolean;
 }
 
 /** Face de mur affichée dans l'éditeur de murs. */
@@ -30,8 +32,8 @@ export interface WallFaceRef {
   key: string;
 }
 
-/** Mode d'édition : plan de la maison, tableau électrique, murs (élévations) ou vue 3D. */
-export type Mode = 'plan' | 'board' | 'walls' | 'view3d';
+/** Mode d'édition : plan de la maison (avec ses murs), tableau électrique, vue 3D ou dossier à remettre. */
+export type Mode = 'plan' | 'board' | 'view3d' | 'dossier';
 
 /** Ce que le plan affiche (n'affecte pas le document ni les exports). */
 export interface ViewOptions {
@@ -69,8 +71,10 @@ export interface AppState {
   activeCircuit: number | null;
   planFocus: PlanFocus | null;
   boardFocus: BoardFocus | null;
-  /** Mur affiché dans l'éditeur de murs (null : le premier de la première pièce). */
+  /** Mur affiché dans le tiroir des murs (null : le premier de la première pièce). */
   wallFace: WallFaceRef | null;
+  /** Tiroir des murs ouvert sous le plan. */
+  wallsOpen: boolean;
   /** Dernier message à afficher (voir `notify`). */
   notice: Notice | null;
   /** Texte de recherche des circuits du tableau (met en retrait ce qui ne correspond pas). */
@@ -114,6 +118,7 @@ export class Store {
       planFocus: null,
       boardFocus: null,
       wallFace: null,
+      wallsOpen: false,
       notice: null,
       boardFilter: '',
     };

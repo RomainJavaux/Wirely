@@ -244,11 +244,52 @@ export interface GeneratedBoard {
   circuits: { plan: CircuitPlan; device: Device }[];
 }
 
-const RCD_NAMES: Readonly<Record<RcdGroup, string>> = {
-  special: 'circuits spécialisés',
+const USAGE_NAMES: Readonly<Record<UsageId, string>> = {
   eclairage: 'éclairage',
   prises: 'prises',
+  special: 'circuits spécialisés',
+  chauffage: 'chauffage',
+  eau: 'eau chaude',
+  autre: 'VMC et volets',
 };
+
+/** « éclairage et prises » : ce que protège un différentiel. */
+function railName(plans: CircuitPlan[]): string {
+  const names = [...new Set(plans.map((p) => USAGE_NAMES[p.usage]))];
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
+}
+
+interface Rail {
+  /** Type A obligatoire : le rail porte des circuits spécialisés. */
+  typeA: boolean;
+  plans: CircuitPlan[];
+}
+
+/**
+ * Répartition des circuits derrière les différentiels : les circuits spécialisés ensemble (type A),
+ * le reste en un ou deux rails (éclairage séparé des prises dès qu'il y a de quoi remplir deux
+ * rails), sans jamais dépasser MAX_CIRCUITS_PER_RCD circuits par différentiel.
+ */
+function splitRails(plans: CircuitPlan[]): Rail[] {
+  const special = plans.filter((p) => p.group === 'special');
+  const rest = plans.filter((p) => p.group !== 'special');
+  const rails: Rail[] = chunk(special, MAX_CIRCUITS_PER_RCD).map((part) => ({ typeA: true, plans: part }));
+
+  if (rest.length === 0) return rails;
+  const light = rest.filter((p) => p.group === 'eclairage');
+  const other = rest.filter((p) => p.group !== 'eclairage');
+
+  if (special.length > 0 && rest.length <= MAX_CIRCUITS_PER_RCD) {
+    // Deux différentiels suffisent : un pour les spécialisés, un pour le reste.
+    rails.push({ typeA: false, plans: rest });
+  } else if (light.length > 0 && other.length > 0 && rest.length >= 4) {
+    for (const part of chunk(light, MAX_CIRCUITS_PER_RCD)) rails.push({ typeA: false, plans: part });
+    for (const part of chunk(other, MAX_CIRCUITS_PER_RCD)) rails.push({ typeA: false, plans: part });
+  } else {
+    for (const part of chunk(rest, MAX_CIRCUITS_PER_RCD)) rails.push({ typeA: false, plans: part });
+  }
+  return rails;
+}
 
 /** Construit un tableau (un différentiel 30 mA par rail) qui porte les circuits proposés. */
 export function buildBoardFromPlan(plans: CircuitPlan[], name: string, nextId: () => number): GeneratedBoard | null {
@@ -260,24 +301,19 @@ export function buildBoardFromPlan(plans: CircuitPlan[], name: string, nextId: (
   const disjDef = getDeviceDef('disj');
   if (!rcdDef || !disjDef) return null;
 
-  // Un différentiel par groupe, rempli par tranches de MAX_CIRCUITS_PER_RCD circuits.
-  const rails: { group: RcdGroup; plans: CircuitPlan[] }[] = [];
-  for (const group of ['special', 'eclairage', 'prises'] as RcdGroup[]) {
-    const mine = plans.filter((p) => p.group === group);
-    for (const part of chunk(mine, MAX_CIRCUITS_PER_RCD)) rails.push({ group, plans: part });
-  }
+  const rails = splitRails(plans);
 
   board.rows = Math.max(1, rails.length);
   rails.forEach((rail, row) => {
-    const typeA = rail.group === 'special';
-    // Un différentiel de 25 A suffit pour un petit rail d'éclairage.
-    const rating = rail.group === 'eclairage' && rail.plans.length <= 5 ? 25 : 40;
+    // Un différentiel de 25 A suffit pour un petit rail d'éclairage seul.
+    const lightOnly = rail.plans.every((p) => p.group === 'eclairage');
+    const rating = lightOnly && rail.plans.length <= 5 ? 25 : 40;
     board.devices.push(
       createDevice(rcdDef, nextId(), row, 0, {
         rating,
-        diffType: typeA ? 'A' : 'AC',
+        diffType: rail.typeA ? 'A' : 'AC',
         sensitivity: 30,
-        note: `Différentiel ${RCD_NAMES[rail.group]}`,
+        note: `Différentiel ${railName(rail.plans)}`,
       }),
     );
     let col = 2;
@@ -336,7 +372,7 @@ export function appendCircuits(board: Board, plans: CircuitPlan[], nextId: () =>
           rating: 40,
           diffType: plan.group === 'special' ? 'A' : 'AC',
           sensitivity: 30,
-          note: `Différentiel ${RCD_NAMES[plan.group]}`,
+          note: `Différentiel ${USAGE_NAMES[plan.usage]}`,
         }),
       );
       target = { row, col: 2 };

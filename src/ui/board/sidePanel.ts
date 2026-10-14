@@ -1,5 +1,6 @@
 import { patchDevice, removeDevice, duplicateDevice, moveDevice } from '../../core/boardActions';
 import { focusDevice, showCircuitOnPlan, showItemOnPlan, startAssigning } from '../../core/links';
+import { connectUnlinked } from '../../core/planActions';
 import type { Store } from '../../core/store';
 import { SECTIONS, USAGES, USAGE_IDS, getDeviceDef, suggestSection } from '../../domain/board/catalog';
 import { deviceSpec, fmtSection } from '../../domain/board/bom';
@@ -13,6 +14,7 @@ import {
   circuitLinks,
   circuitSearchText,
   linksSummary,
+  unlinkedItems,
   type CircuitLinks,
 } from '../../domain/link/links';
 import { fmtLength, polylineLength, toMeters } from '../../domain/plan/metrics';
@@ -80,6 +82,7 @@ export class BoardSidePanel {
       const device = board.devices.find((d) => d.id === deviceSelection);
       this.el.innerHTML = tabs + (device ? this.deviceForm(board, device) : this.summary(board)) + this.checksHtml(board);
       if (device) this.bindDevice(board, device);
+      else this.bindSummary();
       this.bindChecks();
     }
     this.el.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => {
@@ -216,13 +219,21 @@ export class BoardSidePanel {
 
     const links = allLinks(doc);
     const wiredCircuits = a.circuits.filter((d) => (links.get(d.id)?.symbols.length ?? 0) + (links.get(d.id)?.wires.length ?? 0) > 0).length;
+    const orphans = unlinkedItems(doc).symbols.length;
+    const connect =
+      orphans > 0
+        ? `<div class="suggest"><span><b>${orphans} appareil${orphans > 1 ? 's' : ''} du plan sans circuit</b>
+             <small>Raccordés aux circuits qui desservent déjà la pièce, sinon dans de nouveaux circuits.</small></span>
+             <button type="button" id="sumConnect">Raccorder</button></div>`
+        : '';
 
     return `
       <h3>Synthèse</h3>
       <div class="stat"><b>${a.circuits.length}</b> circuit${a.circuits.length > 1 ? 's' : ''} · <b>${a.groups.filter((g) => g.head).length}</b> différentiel${a.groups.filter((g) => g.head).length > 1 ? 's' : ''}</div>
       <div class="meter"><span style="width:${Math.min(100, 100 - pct)}%" class="${low ? 'low' : ''}"></span></div>
       <p class="muted">${a.usedModules} / ${a.totalModules} modules utilisés · ${free} libres (${pct} %)</p>
-      <p class="muted"><b>${wiredCircuits}</b> / ${a.circuits.length} circuits raccordés à des lignes du plan.</p>
+      <p class="muted"><b>${wiredCircuits}</b> / ${a.circuits.length} circuits raccordés à des appareils du plan.</p>
+      ${connect}
       ${legend ? `<ul class="legend">${legend}</ul>` : ''}
       <p class="muted">Cliquez un appareil pour le régler. Glissez-le pour le déplacer, <kbd>Suppr</kbd> pour l'enlever.
       L'onglet <b>Circuits</b> liste tous les disjoncteurs et permet de les rechercher.</p>`;
@@ -438,6 +449,11 @@ export class BoardSidePanel {
       .join('');
     return `<h3>Contrôles <small>(indicatifs)</small></h3><ul class="checks">${items}</ul>
       <p class="muted">Aide à la conception : ne remplace ni la norme en vigueur ni la vérification d'un professionnel.</p>`;
+  }
+
+  private bindSummary(): void {
+    const b = this.el.querySelector<HTMLButtonElement>('#sumConnect');
+    if (b) b.onclick = () => connectUnlinked(this.store);
   }
 
   private bindChecks(): void {
