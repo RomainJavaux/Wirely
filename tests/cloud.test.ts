@@ -20,6 +20,7 @@ describe('friendlyError', () => {
     expect(friendlyError(new ApiError(401, 'x'))).toMatch(/expirée/);
     expect(friendlyError(new ApiError(404, 'x'))).toMatch(/introuvable/);
     expect(friendlyError(new ApiError(429, 'x'))).toMatch(/Trop de tentatives/);
+    expect(friendlyError(new ApiError(500, 'Erreur 500'))).toMatch(/\/api\/status/);
     expect(friendlyError(new Error('boum'))).toMatch(/inattendue/);
   });
 });

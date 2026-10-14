@@ -2,7 +2,11 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\StatusController;
 use Illuminate\Support\Facades\Route;
+
+// Diagnostic d'installation : https://<site>/api/status
+Route::get('status', StatusController::class);
 
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:6,1');

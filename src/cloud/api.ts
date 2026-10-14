@@ -83,6 +83,9 @@ export function friendlyError(e: unknown): string {
   if (e.status === 401) return 'Session expirée : reconnectez-vous.';
   if (e.status === 404) return 'Schéma introuvable, ou privé.';
   if (e.status === 503) return e.message;
+  if (e.status >= 500) {
+    return `Erreur du serveur (${e.status}). Pour un diagnostic, ouvrez /api/status dans votre navigateur.`;
+  }
   if (e.status === 422) {
     const field = Object.keys(e.errors)[0] ?? '';
     // Les messages de connexion sont déjà en français côté serveur.

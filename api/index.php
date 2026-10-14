@@ -11,6 +11,14 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
+// Avant de charger Laravel : une version de PHP trop ancienne produirait une page d'erreur muette.
+if (PHP_VERSION_ID < 80300) {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['message' => 'PHP '.PHP_VERSION.' sur ce site : PHP 8.3 ou plus est requis. Changez la version dans hPanel (Avancé > Configuration PHP).']);
+    exit;
+}
+
 $backend = dirname(__DIR__).'/backend';
 
 if (! is_file($backend.'/vendor/autoload.php')) {

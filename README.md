@@ -125,3 +125,8 @@ Vérifications :
 Ensuite, un `git push` suffit. Si une mise à jour ajoute une migration, relancez
 `php artisan migrate --force` dans `backend/`.
 
+### En cas de problème (erreur 500 à la création de compte, etc.)
+
+Ouvrez `https://<votre-domaine>/api/status` dans le navigateur : la page teste le serveur depuis
+le contexte web (version de PHP, droits d'écriture, cache, base, tables) et indique quoi corriger.
+Le détail technique de l'erreur est dans `backend/storage/logs/laravel.log`.
