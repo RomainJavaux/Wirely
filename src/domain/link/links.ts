@@ -32,10 +32,13 @@ export function locateDevice(doc: Pick<Doc, 'boards'>, deviceId: number | null):
 /** Catégories de symboles qui n'ont pas de raccordement à un disjoncteur. */
 const UNPOWERED_CATEGORIES = new Set(['Ouvertures', 'Distribution']);
 
+/** Courants faibles : ces prises (réseau, télévision) ne se raccordent pas à un disjoncteur. */
+const LOW_VOLTAGE = new Set(['rj45', 'tv']);
+
 /** Vrai pour un symbole qui doit être alimenté (prise, lampe, commande, équipement…). */
 export const isElectrical = (s: SymbolItem): boolean => {
   const cat = getSymbol(s.kind)?.category;
-  return cat !== undefined && !UNPOWERED_CATEGORIES.has(cat);
+  return cat !== undefined && !UNPOWERED_CATEGORIES.has(cat) && !LOW_VOLTAGE.has(s.kind);
 };
 
 export interface CircuitOption {

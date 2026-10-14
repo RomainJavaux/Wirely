@@ -17,6 +17,12 @@ export interface BoardFocus {
   deviceId: number;
 }
 
+/** Message bref à l'utilisateur (confirmation d'une action automatique). */
+export interface Notice {
+  seq: number;
+  text: string;
+}
+
 /** Face de mur affichée dans l'éditeur de murs. */
 export interface WallFaceRef {
   roomId: number;
@@ -65,6 +71,8 @@ export interface AppState {
   boardFocus: BoardFocus | null;
   /** Mur affiché dans l'éditeur de murs (null : le premier de la première pièce). */
   wallFace: WallFaceRef | null;
+  /** Dernier message à afficher (voir `notify`). */
+  notice: Notice | null;
   /** Texte de recherche des circuits du tableau (met en retrait ce qui ne correspond pas). */
   boardFilter: string;
 }
@@ -106,6 +114,7 @@ export class Store {
       planFocus: null,
       boardFocus: null,
       wallFace: null,
+      notice: null,
       boardFilter: '',
     };
     this.history = [JSON.stringify(doc)];

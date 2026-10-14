@@ -1,12 +1,15 @@
 import { translateItem } from '../domain/geometry';
 import { MAX_CEILING, MIN_CEILING } from '../domain/document';
-import { isElectrical } from '../domain/link/links';
+import { suggestCircuit } from '../domain/link/autoCircuits';
+import { circuitOptions, circuitTitle, isElectrical } from '../domain/link/links';
+import { wallRealignments } from '../domain/walls/snap';
 import { MAX_SCALE, MIN_SCALE } from '../domain/plan/metrics';
 import { detachPart, mergeRooms } from '../domain/plan/rooms';
 import { buildBoard } from '../domain/board/templates';
 import { examplePlan, linkExample } from '../domain/plan/templates';
 import type { Board } from '../domain/board/types';
 import type { NewItem, Item, Rotation, Room } from '../domain/types';
+import { notify } from './planActions';
 import type { Store } from './store';
 
 /** Ajoute un élément, le sélectionne et valide. Retourne son identifiant. */
@@ -18,9 +21,22 @@ export function addItem(store: Store, draft: NewItem): number {
   if (active !== null && (item.type === 'wire' || (item.type === 'symbol' && isElectrical(item)))) {
     item.breaker = active;
   }
+
+  // Sans circuit actif : un appareil se raccorde de lui-même au circuit qui dessert déjà sa pièce.
+  let suggested: string | null = null;
+  if (active === null && item.type === 'symbol' && item.breaker === null && isElectrical(item)) {
+    const s = suggestCircuit(doc, item);
+    if (s) {
+      item.breaker = s.deviceId;
+      const o = circuitOptions(doc).find((x) => x.id === s.deviceId);
+      suggested = o ? circuitTitle(doc, o) : null;
+    }
+  }
+
   doc.items.push(item);
   store.state.selection = item.id;
   store.commit();
+  if (suggested) notify(store, `Raccordé au circuit « ${suggested} » (modifiable dans le panneau de droite).`);
   return item.id;
 }
 
@@ -88,6 +104,12 @@ export function loadExamplePlan(store: Store): boolean {
   }
 
   const items = example.items.map((draft) => ({ ...draft, id: doc.nextId++ }) as Item);
+  // L'exemple est dessiné « à l'œil » : on accroche les appareils aux murs, comme le fait la pose.
+  const moves = new Map(wallRealignments({ items, scale: doc.scale }).map((m) => [m.id, m] as const));
+  items.forEach((it, i) => {
+    const m = moves.get(it.id);
+    if (m && it.type === 'symbol') items[i] = { ...it, x: m.x, y: m.y, rot: m.rot };
+  });
   if (board) linkExample(items, board);
   doc.items.push(...items);
 
