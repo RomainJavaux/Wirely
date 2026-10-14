@@ -1,3 +1,4 @@
+import { unlinkedItems } from '../link/links';
 import type { Doc } from '../types';
 import { getRoomKind } from './roomKinds';
 import { fmtArea, roomStats } from './metrics';
@@ -15,7 +16,7 @@ export interface PlanCheck {
  * Contrôles simples d'aide à la conception, pièce par pièce. Les minimums sont des repères
  * indicatifs inspirés de la NF C 15-100 : ils ne remplacent ni la norme ni un professionnel.
  */
-export function runPlanChecks(doc: Pick<Doc, 'items' | 'scale'>): PlanCheck[] {
+export function runPlanChecks(doc: Pick<Doc, 'items' | 'scale'> & Partial<Pick<Doc, 'boards'>>): PlanCheck[] {
   const checks: PlanCheck[] = [];
   const stats = roomStats(doc);
   if (stats.length === 0) return checks;
@@ -40,6 +41,18 @@ export function runPlanChecks(doc: Pick<Doc, 'items' | 'scale'>): PlanCheck[] {
     }
     if (!s.room.label.trim() && kind.id === 'autre') {
       checks.push({ severity: 'info', itemId: s.room.id, message: `Pièce de ${fmtArea(s.area)} sans nom ni type.` });
+    }
+  }
+
+  // Raccordement : n'a de sens que s'il existe un tableau auquel raccorder.
+  if ((doc.boards?.length ?? 0) > 0) {
+    const u = unlinkedItems(doc);
+    const n = u.wires.length + u.symbols.length;
+    if (n > 0) {
+      const parts: string[] = [];
+      if (u.wires.length) parts.push(`${u.wires.length} câble${u.wires.length > 1 ? 's' : ''}`);
+      if (u.symbols.length) parts.push(`${u.symbols.length} appareil${u.symbols.length > 1 ? 's' : ''}`);
+      checks.push({ severity: 'info', message: `${parts.join(' et ')} non raccordé${n > 1 ? 's' : ''} à un disjoncteur.` });
     }
   }
 

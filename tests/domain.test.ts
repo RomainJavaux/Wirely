@@ -59,7 +59,7 @@ describe('parseDoc', () => {
 describe('export SVG', () => {
   it('contient le titre échappé et une légende', () => {
     const doc = createDoc('Maison <1>');
-    doc.items.push({ id: 1, type: 'symbol', kind: 'prise', x: 0, y: 0, rot: 0, label: '', circuit: '', height: null });
+    doc.items.push({ id: 1, type: 'symbol', kind: 'prise', x: 0, y: 0, rot: 0, label: '', breaker: null, board: null, height: null });
     const svg = buildExportSvg(doc);
     expect(svg).toContain('Maison &lt;1&gt;');
     expect(svg).toContain('Légende');

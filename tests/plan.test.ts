@@ -15,7 +15,7 @@ const room = (id: number, x: number, y: number, w: number, h: number, kind: Room
   id, type: 'room', x, y, w, h, label, kind, parts: [],
 });
 const sym = (id: number, kind: string, x: number, y: number): Item => ({
-  id, type: 'symbol', kind, x, y, rot: 0, label: '', circuit: '', height: null,
+  id, type: 'symbol', kind, x, y, rot: 0, label: '', breaker: null, board: null, height: null,
 });
 const docWith = (items: Item[], scale = 0.5): Doc => ({ ...createDoc('Test'), items, scale });
 const exampleDoc = (): Doc => {
@@ -98,8 +98,8 @@ describe('surfaces et équipements par pièce', () => {
   it('totalise surfaces, appareils et longueurs de câble', () => {
     const doc = docWith([
       room(1, 0, 0, 200, 200),
-      { id: 2, type: 'wire', points: [[0, 0], [100, 0]], wtype: 'prises', circuit: '' },
-      { id: 3, type: 'wire', points: [[0, 0], [0, 100]], wtype: 'prises', circuit: '' },
+      { id: 2, type: 'wire', points: [[0, 0], [100, 0]], wtype: 'prises', breaker: null },
+      { id: 3, type: 'wire', points: [[0, 0], [0, 100]], wtype: 'prises', breaker: null },
       sym(4, 'prise', 1, 1),
     ]);
     const s = planSummary(doc);
@@ -213,8 +213,8 @@ describe('fichiers et compatibilité', () => {
     });
     expect(doc.scale).toBe(0.5);
     expect(doc.items[0]).toMatchObject({ kind: 'autre' });
-    expect(doc.items[1]).toMatchObject({ circuit: '', height: null });
-    expect(doc.items[2]).toMatchObject({ circuit: '' });
+    expect(doc.items[1]).toMatchObject({ breaker: null, board: null, height: null });
+    expect(doc.items[2]).toMatchObject({ breaker: null });
   });
 
   it('borne les valeurs saisies à la main dans un fichier', () => {
@@ -228,7 +228,6 @@ describe('fichiers et compatibilité', () => {
     expect(doc.scale).toBe(0.5);
     expect(doc.items[0]).toMatchObject({ kind: 'autre' });
     const symbol = doc.items[1];
-    expect(symbol?.type === 'symbol' && symbol.circuit.length).toBe(40);
     expect(symbol).toMatchObject({ height: null });
   });
 

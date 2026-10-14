@@ -10,6 +10,10 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
   Surfaces, cotes et longueurs de câble sont calculées ; un panneau de synthèse et des contrôles
   indicatifs par pièce (prises, point lumineux, détecteur de fumée) aident à la conception.
   Chaque symbole peut porter un circuit du tableau et une hauteur de pose.
+  **Lien avec le tableau** : le symbole « tableau » du plan représente un tableau (double-clic pour
+  l'ouvrir) ; chaque câble ou appareil se raccorde à un **disjoncteur précis** (par identifiant, donc
+  indépendant du renumérotage). On choisit un *circuit actif* — ce qu'on dessine s'y raccorde et le
+  reste est atténué — ou on raccorde l'existant d'un clic avec l'outil *Affecter*.
   Une pièce en L ou en U est **une seule pièce** : on fusionne des rectangles (une seule surface,
   un seul nom, un contour unifié), et on peut détacher une partie ensuite.
   Export : fiche avec plan coté et barre d'échelle, légende chiffrée, tableau des pièces et
@@ -21,6 +25,10 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
   Modules de domotique **Niko** (Nikobus et Home Control II) avec sorties nommables et règles de bus.
   Les contrôles (section/calibre, différentiel amont, réserve de 20 %…) sont **indicatifs**
   et ne remplacent ni la norme ni un professionnel.
+  Du côté tableau : pastille sur chaque disjoncteur (nombre de lignes raccordées), section
+  « Derrière ce disjoncteur » (appareils, câbles, pièces desservies, accès direct au plan) et onglet
+  **Circuits** pour les gros tableaux : liste groupée par différentiel, recherche (nom, pièce,
+  repère, appareil…) qui met en retrait le reste de la face avant, défilement vers l'appareil.
 
 ## Lancer
 
@@ -95,7 +103,10 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
 
 ## Format de fichier
 
-JSON : `{ name, scale, nextId, items: [...], boards: [...] }` (`scale` : mètres par carreau). Les fichiers sont validés et normalisés à
+JSON : `{ name, scale, nextId, items: [...], boards: [...] }` (`scale` : mètres par carreau).
+Les câbles et symboles portent `breaker` (identifiant d'un appareil du tableau, ou `null`) ; un
+symbole « tableau » porte `board`. Les anciens fichiers, où le circuit était un repère saisi à la
+main, sont migrés à l'ouverture sur le premier tableau. Les fichiers sont validés et normalisés à
 l'ouverture (`parseDoc`) ; les anciens fichiers (`nid`) restent lisibles.
 
 ## Déploiement (Hostinger, par git)

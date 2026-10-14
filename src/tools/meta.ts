@@ -20,6 +20,8 @@ export const TOOLS_META: readonly ToolMeta[] = [
     hint: 'Cliquez pour poser les points du mur. Double-clic ou Entrée pour terminer.' },
   { id: 'wire', label: '〰 Câble', key: 'l', cursor: 'crosshair', inToolbar: true,
     hint: 'Cliquez pour tracer le câble (il s’accroche aux symboles). Double-clic ou Entrée pour terminer.' },
+  { id: 'assign', label: '🔗 Affecter', key: 'a', cursor: 'crosshair', inToolbar: true,
+    hint: 'Cliquez les câbles et appareils à raccorder au circuit actif ; re-cliquez pour les détacher.' },
   { id: 'text', label: '𝐓 Texte', key: 't', cursor: 'crosshair', inToolbar: true,
     hint: 'Cliquez où placer le texte.' },
   { id: 'symbol', label: 'Symbole', cursor: 'crosshair', inToolbar: false,

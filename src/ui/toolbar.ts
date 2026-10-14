@@ -43,7 +43,7 @@ export class Toolbar {
         if (kind === 'png') exportBoardPng(doc, board);
         else if (kind === 'svg') exportBoardSvg(doc, board);
         else if (kind === 'pdf') exportBoardPdf(doc, board);
-        else if (kind === 'csv') exportBoardCsv(board);
+        else if (kind === 'csv') exportBoardCsv(doc, board);
       } else if (kind === 'png') exportPng(doc);
       else if (kind === 'svg') exportSvg(doc);
       else if (kind === 'pdf') exportPdf(doc);

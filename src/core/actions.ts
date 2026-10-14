@@ -1,7 +1,10 @@
 import { translateItem } from '../domain/geometry';
+import { isElectrical } from '../domain/link/links';
 import { MAX_SCALE, MIN_SCALE } from '../domain/plan/metrics';
 import { detachPart, mergeRooms } from '../domain/plan/rooms';
-import { examplePlan } from '../domain/plan/templates';
+import { buildBoard } from '../domain/board/templates';
+import { examplePlan, linkExample } from '../domain/plan/templates';
+import type { Board } from '../domain/board/types';
 import type { NewItem, Item, Rotation, Room } from '../domain/types';
 import type { Store } from './store';
 
@@ -9,6 +12,11 @@ import type { Store } from './store';
 export function addItem(store: Store, draft: NewItem): number {
   const doc = store.state.doc;
   const item = { ...draft, id: doc.nextId++ } as Item;
+  // Avec un circuit actif, ce qu'on dessine s'y raccorde directement.
+  const active = store.state.activeCircuit;
+  if (active !== null && (item.type === 'wire' || (item.type === 'symbol' && isElectrical(item)))) {
+    item.breaker = active;
+  }
   doc.items.push(item);
   store.state.selection = item.id;
   store.commit();
@@ -61,12 +69,27 @@ export function setScale(store: Store, metersPerCell: number): void {
   store.commit();
 }
 
-/** Charge l'appartement d'exemple. Retourne false si le plan contient déjà des éléments. */
+/**
+ * Charge l'appartement d'exemple, avec un tableau « logement » dont les disjoncteurs sont déjà
+ * reliés aux câbles et appareils du plan. Retourne false si le plan contient déjà des éléments.
+ */
 export function loadExamplePlan(store: Store): boolean {
   const doc = store.state.doc;
   if (doc.items.length > 0) return false;
   const example = examplePlan();
-  for (const draft of example.items) doc.items.push({ ...draft, id: doc.nextId++ } as Item);
+
+  let board: Board | null = null;
+  if (doc.boards.length === 0) {
+    board = buildBoard('logement', 'Tableau principal', () => doc.nextId++);
+    board.location = 'Entrée';
+    doc.boards.push(board);
+    store.state.boardId = board.id;
+  }
+
+  const items = example.items.map((draft) => ({ ...draft, id: doc.nextId++ }) as Item);
+  if (board) linkExample(items, board);
+  doc.items.push(...items);
+
   if (doc.name === 'Mon installation') doc.name = example.name;
   store.state.selection = null;
   store.commit();

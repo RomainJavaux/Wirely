@@ -1,6 +1,7 @@
 import { WIRE_TYPES, getSymbol } from '../domain/catalog';
 import { GRID, unionBounds } from '../domain/geometry';
 import { planBomRows, planSubtitle, roomRows } from '../domain/plan/export';
+import { allLinks, circuitOptions, circuitTitle, linksSummary } from '../domain/link/links';
 import { fmtLength, planSummary } from '../domain/plan/metrics';
 import type { Doc } from '../domain/types';
 import { GLYPH_ATTRS, renderScene } from '../render/items';
@@ -106,6 +107,28 @@ function roomsSection(doc: Doc): SheetSection | null {
   return { title: 'Pièces', svg: t.svg, width: 1200, height: t.height };
 }
 
+/** Ce qu'il y a derrière chaque disjoncteur : appareils, longueur de câble et pièces desservies. */
+function circuitsSection(doc: Doc): SheetSection | null {
+  if (doc.boards.length === 0) return null;
+  const links = allLinks(doc);
+  const rows = circuitOptions(doc)
+    .map((o) => ({ o, l: links.get(o.id) }))
+    .filter((r) => r.l !== undefined);
+  if (rows.length === 0) return null;
+
+  const t = table(
+    1200,
+    [
+      { title: 'Circuit', frac: 0.3, get: (r) => circuitTitle(doc, r.o) },
+      { title: 'Différentiel', frac: 0.1, get: (r) => r.o.group ?? '' },
+      { title: 'Raccordé au plan', frac: 0.3, get: (r) => (r.l ? linksSummary(r.l) : '') },
+      { title: 'Pièces desservies', frac: 0.3, get: (r) => (r.l ? r.l.rooms.map((x) => `${x.label} (${x.count})`).join(', ') : '') },
+    ],
+    rows,
+  );
+  return { title: 'Circuits raccordés au plan', svg: t.svg, width: 1200, height: t.height };
+}
+
 function materialsSection(doc: Doc): SheetSection | null {
   const rows = planBomRows(doc);
   if (rows.length === 0) return null;
@@ -125,7 +148,7 @@ function materialsSection(doc: Doc): SheetSection | null {
 
 /** Sections de la fiche du plan : plan coté, légende chiffrée, pièces, nomenclature. */
 export function buildPlanSections(doc: Doc): SheetSection[] {
-  return [planSection(doc), legendSection(doc), roomsSection(doc), materialsSection(doc)].filter(
+  return [planSection(doc), legendSection(doc), roomsSection(doc), circuitsSection(doc), materialsSection(doc)].filter(
     (s): s is SheetSection => s !== null,
   );
 }

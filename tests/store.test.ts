@@ -63,14 +63,14 @@ describe('Actions', () => {
 
   it('pivote un symbole par pas de 90°', () => {
     const store = newStore();
-    const id = addItem(store, { type: 'symbol', kind: 'prise', x: 0, y: 0, rot: 270, label: '', circuit: '', height: null });
+    const id = addItem(store, { type: 'symbol', kind: 'prise', x: 0, y: 0, rot: 270, label: '', breaker: null, board: null, height: null });
     rotateSelection(store);
     expect(store.getItem(id)).toMatchObject({ rot: 0 });
   });
 
   it('duplique en décalant la copie', () => {
     const store = newStore();
-    addItem(store, { type: 'symbol', kind: 'prise', x: 10, y: 10, rot: 0, label: '', circuit: '', height: null });
+    addItem(store, { type: 'symbol', kind: 'prise', x: 10, y: 10, rot: 0, label: '', breaker: null, board: null, height: null });
     duplicateSelection(store);
     const [orig, copy] = store.state.doc.items;
     expect(copy).toMatchObject({ x: 30, y: 30 });

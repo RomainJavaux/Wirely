@@ -1,8 +1,21 @@
-import { deleteSelection, detachRoomPart, duplicateSelection, rotateSelection, startMerge } from '../core/actions';
+import { deleteSelection, detachRoomPart, duplicateSelection, rotateSelection, setTool, startMerge } from '../core/actions';
+import {
+  assignBreaker,
+  createLinkedBoard,
+  linkSymbolToBoard,
+  openBoard,
+  showDeviceInBoard,
+} from '../core/links';
+import {
+  circuitFromTitle,
+  circuitLinks,
+  circuitOptions,
+  circuitTitle,
+  isElectrical,
+  unlinkedItems,
+} from '../domain/link/links';
 import type { Store } from '../core/store';
 import { WIRE_TYPES, WIRE_TYPE_IDS, SYMBOL_CATEGORIES, getSymbol } from '../domain/catalog';
-import { getDeviceDef } from '../domain/board/catalog';
-import { analyze } from '../domain/board/layout';
 import { runPlanChecks } from '../domain/plan/checks';
 import {
   fmtArea,
@@ -121,6 +134,22 @@ export class PropertiesPanel {
       })
       .join('');
 
+    // Raccordement au tableau : avancement, circuit actif et accès rapide à l'outil Affecter.
+    let wiring = '';
+    if (doc.boards.length > 0) {
+      const u = unlinkedItems(doc);
+      const electrical = doc.items.filter((i) => i.type === 'wire' || (i.type === 'symbol' && isElectrical(i))).length;
+      const done = electrical - u.wires.length - u.symbols.length;
+      const pct = electrical === 0 ? 0 : Math.round((done / electrical) * 100);
+      const activeId = this.store.state.activeCircuit;
+      const active = activeId !== null ? circuitOptions(doc).find((o) => o.id === activeId) : undefined;
+      wiring = `<h3>Raccordement au tableau</h3>
+        <div class="meter"><span style="width:${pct}%"></span></div>
+        <p class="muted">${done} / ${electrical} éléments raccordés (${pct} %)</p>
+        ${active ? `<p class="muted">Circuit actif : <b>${esc(circuitTitle(doc, active))}</b></p>` : ''}
+        <div class="row"><button type="button" id="sumAssign">🔗 Raccorder des éléments…</button></div>`;
+    }
+
     const checkList =
       s.rooms === 0
         ? ''
@@ -139,12 +168,15 @@ export class PropertiesPanel {
       ${tiles}
       ${cats ? `<h3>Appareillage</h3><ul class="legend">${cats}</ul>` : ''}
       ${wires ? `<h3>Câbles <small>· ${fmtLength(s.wireLength)}</small></h3><ul class="legend">${wires}</ul>` : ''}
+      ${wiring}
       ${s.wallLength > 0 ? `<p class="muted">Murs : ${fmtLength(s.wallLength)} linéaires.</p>` : ''}
       ${checkList}
       ${SHORTCUTS}`;
   }
 
   private bindSummary(): void {
+    const assign = this.el.querySelector<HTMLButtonElement>('#sumAssign');
+    if (assign) assign.onclick = () => setTool(this.store, 'assign');
     this.el.querySelectorAll<HTMLElement>('[data-item]').forEach((li) => {
       li.onclick = () => {
         const id = Number(li.dataset.item);
@@ -155,19 +187,40 @@ export class PropertiesPanel {
 
   // ---------------------------------------------------------------- formulaire
 
-  /** Suggestions de circuits : ceux du tableau en cours d'édition (ou du premier). */
-  private circuitOptions(): string {
-    const { doc, boardId } = this.store.state;
-    const board = doc.boards.find((b) => b.id === boardId) ?? doc.boards[0];
-    if (!board) return '';
-    const a = analyze(board);
-    return a.circuits
-      .map((d) => {
-        const ref = a.refs.get(d.id) ?? '';
-        const name = d.label.trim() || getDeviceDef(d.kind)?.name || '';
-        return `<option value="${esc(ref)}">${esc(name)}</option>`;
-      })
-      .join('');
+  /** Champ « Disjoncteur » : recherche par saisie dans la liste des circuits de tous les tableaux. */
+  private breakerField(breaker: number | null): string {
+    const { doc } = this.store.state;
+    const options = circuitOptions(doc);
+    const current = breaker !== null ? options.find((o) => o.id === breaker) : undefined;
+    const none = options.length === 0;
+    return `<label class="f" for="pBreaker">Disjoncteur</label>
+      <div class="ac">
+        <input type="text" id="pBreaker" list="circuitList" autocomplete="off"
+          value="${esc(current ? circuitTitle(doc, current) : '')}"
+          placeholder="${none ? 'Aucun tableau' : 'Rechercher un circuit…'}"${none ? ' disabled' : ''}>
+        ${current ? '<button type="button" id="pBreakerGo" title="Voir ce disjoncteur dans le tableau">Tableau ↗</button>' : ''}
+      </div>
+      <datalist id="circuitList">${options.map((o) => `<option value="${esc(circuitTitle(doc, o))}"></option>`).join('')}</datalist>`;
+  }
+
+  /** Pour un symbole « tableau » : tableau représenté, ouverture et création. */
+  private boardField(boardId: number | null): string {
+    const { doc } = this.store.state;
+    const linked = doc.boards.find((b) => b.id === boardId);
+    const circuits = linked ? circuitOptions({ boards: [linked] }).length : 0;
+    const wired = linked ? [...new Set(linked.devices.map((d) => d.id))].filter((id) => circuitLinks(doc, id).symbols.length + circuitLinks(doc, id).wires.length > 0).length : 0;
+    return `<label class="f" for="pBoard">Tableau représenté</label>
+      <select id="pBoard">
+        <option value="">— aucun —</option>
+        ${doc.boards
+          .map((b) => `<option value="${b.id}"${b.id === boardId ? ' selected' : ''}>${esc(b.name)}${b.location ? ` · ${esc(b.location)}` : ''}</option>`)
+          .join('')}
+      </select>
+      <div class="row">
+        <button type="button" id="pOpenBoard"${linked ? '' : ' disabled'}>Ouvrir le tableau ↗</button>
+        <button type="button" id="pNewBoard">Créer un tableau</button>
+      </div>
+      ${linked ? `<p class="muted"><b>${circuits}</b> circuit${circuits > 1 ? 's' : ''}, dont <b>${wired}</b> raccordé${wired > 1 ? 's' : ''} à des lignes du plan.</p>` : ''}`;
   }
 
   private form(item: Item): string {
@@ -219,14 +272,11 @@ export class PropertiesPanel {
     if (item.type === 'symbol') {
       const room = roomAt(roomsOf(doc.items), item.x, item.y);
       h += `<label class="f" for="pLabel">Nom / repère</label>
-        <input type="text" id="pLabel" value="${esc(item.label)}" placeholder="ex. Prise plan de travail">
-        <div class="two">
-          <div><label class="f" for="pCircuit">Circuit</label>
-            <input type="text" id="pCircuit" list="circuitList" value="${esc(item.circuit)}" placeholder="ex. 3" maxlength="12"></div>
-          <div><label class="f" for="pHeight">Hauteur (cm)</label>
-            <input type="number" id="pHeight" list="heightList" min="0" max="400" step="5" value="${item.height ?? ''}" placeholder="—"></div>
-        </div>
-        <datalist id="circuitList">${this.circuitOptions()}</datalist>
+        <input type="text" id="pLabel" value="${esc(item.label)}" placeholder="ex. Prise plan de travail">`;
+      if (isElectrical(item)) h += this.breakerField(item.breaker);
+      if (item.kind === 'tableau') h += this.boardField(item.board);
+      h += `<label class="f" for="pHeight">Hauteur de pose (cm)</label>
+        <input type="number" id="pHeight" list="heightList" min="0" max="400" step="5" value="${item.height ?? ''}" placeholder="—">
         <datalist id="heightList">${HEIGHTS.map((n) => `<option value="${n}">`).join('')}</datalist>
         <p class="muted">${room ? `Dans : <b>${esc(room.label.trim() || getRoomKind(room.kind).name)}</b>` : 'Hors de toute pièce'}</p>`;
     }
@@ -236,9 +286,7 @@ export class PropertiesPanel {
         (id) => `<option value="${id}"${id === item.wtype ? ' selected' : ''}>${esc(WIRE_TYPES[id].name)}</option>`,
       ).join('');
       h += `<label class="f" for="pWire">Type de câble</label><select id="pWire">${options}</select>
-        <label class="f" for="pCircuit">Circuit</label>
-        <input type="text" id="pCircuit" list="circuitList" value="${esc(item.circuit)}" placeholder="ex. 3" maxlength="12">
-        <datalist id="circuitList">${this.circuitOptions()}</datalist>
+        ${this.breakerField(item.breaker)}
         <p class="muted">Longueur : <b>${fmtLength(wireLengthM(doc, item))}</b></p>`;
     }
 
@@ -275,7 +323,29 @@ export class PropertiesPanel {
     };
     text('#pLabel', (i, v) => (i.type === 'room' || i.type === 'symbol' ? { ...i, label: v } : i));
     text('#pText', (i, v) => (i.type === 'text' ? { ...i, text: v } : i));
-    text('#pCircuit', (i, v) => (i.type === 'symbol' || i.type === 'wire' ? { ...i, circuit: v.slice(0, 12) } : i));
+
+    // Disjoncteur : saisie dans la liste ; une valeur inconnue est annulée.
+    const breaker = $<HTMLInputElement>('#pBreaker');
+    if (breaker) {
+      breaker.onchange = () => {
+        const text = breaker.value.trim();
+        const found = text ? circuitFromTitle(store.state.doc, text) : null;
+        if (text && !found) {
+          this.key = ''; // saisie inconnue : on reconstruit le panneau avec la valeur actuelle
+          this.render();
+          return;
+        }
+        assignBreaker(store, id, found ? found.id : null);
+      };
+    }
+    const linkedBreaker = (): number | null => {
+      const it = store.getItem(id);
+      return it && (it.type === 'wire' || it.type === 'symbol') ? it.breaker : null;
+    };
+
+    // Symbole « tableau » : lien vers un tableau.
+    const boardSel = $<HTMLSelectElement>('#pBoard');
+    if (boardSel) boardSel.onchange = () => linkSymbolToBoard(store, id, boardSel.value ? Number(boardSel.value) : null);
 
     const height = $<HTMLInputElement>('#pHeight');
     if (height) {
@@ -322,6 +392,15 @@ export class PropertiesPanel {
       if (b) b.onclick = fn;
     };
     on('#pMerge', () => startMerge(store));
+    on('#pBreakerGo', () => {
+      const b = linkedBreaker();
+      if (b !== null) showDeviceInBoard(store, b);
+    });
+    on('#pOpenBoard', () => {
+      const it = store.getItem(id);
+      if (it?.type === 'symbol' && it.board !== null) openBoard(store, it.board);
+    });
+    on('#pNewBoard', () => createLinkedBoard(store, id));
     this.el.querySelectorAll<HTMLButtonElement>('[data-detach]').forEach((b) => {
       b.onclick = () => detachRoomPart(store, id, Number(b.dataset.detach));
     });

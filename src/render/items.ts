@@ -23,6 +23,10 @@ export interface RenderOptions {
   scale?: number;
   /** Calques masqués. */
   hide?: { wires?: boolean; symbols?: boolean; texts?: boolean };
+  /** Repère et couleur de chaque disjoncteur : étiquette les éléments qui y sont raccordés. */
+  circuits?: ReadonlyMap<number, { ref: string; color: string }>;
+  /** Circuit actif : ses éléments ressortent, les autres sont atténués. */
+  activeCircuit?: number | null;
 }
 
 const points = (pts: readonly (readonly number[])[]): string => pts.map((p) => p.join(',')).join(' ');
@@ -138,18 +142,27 @@ const renderWallInner = (it: Wall): string =>
   `stroke-linejoin="miter" stroke-linecap="square" pointer-events="none"/>`;
 
 function renderWire(it: Wire, o: RenderOptions, selected: boolean): string {
-  const attr = o.interactive ? ` data-id="${it.id}"` : '';
   const w = getWireType(it.wtype);
   const p = points(it.points);
+  const active = o.activeCircuit ?? null;
+  const hot = active !== null && it.breaker === active;
+  const dim = active !== null && !hot;
+  const info = it.breaker !== null ? o.circuits?.get(it.breaker) : undefined;
+
+  const attr = (o.interactive ? ` data-id="${it.id}"` : '') + (dim ? ' opacity=".2"' : '');
   const dash = w.dash ? ` stroke-dasharray="${w.dash}"` : '';
   const hit = o.interactive ? `<polyline points="${p}" fill="none" stroke="transparent" stroke-width="14"/>` : '';
   const dots = it.points.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6" fill="${w.color}"/>`).join('');
+  const halo = hot
+    ? `<polyline points="${p}" fill="none" stroke="${info?.color ?? w.color}" stroke-width="10" stroke-opacity=".25" stroke-linejoin="round" stroke-linecap="round"/>`
+    : '';
+
   let out =
-    `<g${attr}><polyline points="${p}" fill="none" stroke="${w.color}" stroke-width="${selected ? 3.6 : 2.4}" ` +
+    `<g${attr}>${halo}<polyline points="${p}" fill="none" stroke="${w.color}" stroke-width="${selected ? 3.6 : hot ? 3.2 : 2.4}" ` +
     `stroke-linejoin="round" stroke-linecap="round"${dash}/>${dots}${hit}`;
-  if (it.circuit.trim()) {
+  if (info) {
     const [mx, my] = midPoint(it.points);
-    out += pill(mx, my, it.circuit.trim(), { size: 9.5, fill: '#fff', color: w.color });
+    out += pill(mx, my, info.ref, { size: 9.5, fill: info.color, color: '#fff' });
   }
   return out + '</g>';
 }
@@ -157,7 +170,12 @@ function renderWire(it: Wire, o: RenderOptions, selected: boolean): string {
 function renderSymbol(it: SymbolItem, o: RenderOptions, selected: boolean): string {
   const def = getSymbol(it.kind);
   if (!def) return '';
-  const attr = o.interactive ? ` data-id="${it.id}"` : '';
+  const active = o.activeCircuit ?? null;
+  const hot = active !== null && it.breaker === active;
+  const dim = active !== null && !hot && !def.gap && it.kind !== 'tableau';
+  const info = it.breaker !== null ? o.circuits?.get(it.breaker) : undefined;
+
+  const attr = (o.interactive ? ` data-id="${it.id}"` : '') + (dim ? ' opacity=".25"' : '');
   const stroke = selected ? ACCENT : '#111';
   const transform = `translate(${it.x} ${it.y}) rotate(${it.rot})`;
 
@@ -170,9 +188,10 @@ function renderSymbol(it: SymbolItem, o: RenderOptions, selected: boolean): stri
     `<g${attr}><g transform="${transform}"><g>${backdrop}</g>` +
     `<g stroke="${stroke}" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round">${def.svg}</g></g>`;
 
+  if (hot) out += `<circle cx="${it.x}" cy="${it.y}" r="19" fill="${info?.color ?? ACCENT}" fill-opacity=".14" stroke="${info?.color ?? ACCENT}" stroke-width="2"/>`;
   if (selected) out += `<circle cx="${it.x}" cy="${it.y}" r="20" fill="none" stroke="${ACCENT}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
   if (it.label.trim()) out += pill(it.x, it.y + 31, it.label.trim(), { size: 9.5 });
-  if (it.circuit.trim()) out += pill(it.x + 17, it.y - 15, it.circuit.trim(), { size: 8.5, fill: '#fff7e6', color: '#8a4b00' });
+  if (info) out += pill(it.x + 17, it.y - 15, info.ref, { size: 8.5, fill: info.color, color: '#fff' });
   if (o.interactive) out += `<rect x="${it.x - 17}" y="${it.y - 17}" width="34" height="34" fill="transparent"/>`;
   return out + '</g>';
 }

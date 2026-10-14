@@ -1,7 +1,9 @@
+import { analyze } from './board/layout';
 import { parseBoards } from './board/parse';
 import { WIRE_TYPES } from './catalog';
 import { DEFAULT_SCALE, MAX_SCALE, MIN_SCALE } from './plan/metrics';
 import { ROOM_KINDS } from './plan/roomKinds';
+import type { Board } from './board/types';
 import type { Doc, Item, ItemType, Point, Rotation, RoomKind, RoomRect } from './types';
 
 export const DEFAULT_NAME = 'Mon installation';
@@ -38,8 +40,19 @@ function parseParts(v: unknown): RoomRect[] {
     .map((q) => ({ x: q.x as number, y: q.y as number, w: q.w as number, h: q.h as number }));
 }
 
+/**
+ * Identifiant du disjoncteur. Les anciens fichiers portaient un repère saisi à la main (`circuit`) :
+ * on le mémorise pour le résoudre une fois les tableaux lus.
+ */
+function breakerOf(r: Record<string, unknown>, legacy: Map<number, string>): number | null {
+  if (isNum(r.breaker)) return r.breaker;
+  const old = str(r.circuit);
+  if (old.trim() && isNum(r.id)) legacy.set(r.id, old.trim());
+  return null;
+}
+
 /** Valide et normalise un élément brut ; retourne null s'il est inutilisable. */
-function parseItem(raw: unknown): Item | null {
+function parseItem(raw: unknown, legacy: Map<number, string>): Item | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
   if (!isNum(r.id)) return null;
@@ -66,7 +79,7 @@ function parseItem(raw: unknown): Item | null {
         type: 'wire',
         points: r.points,
         wtype: isStr(r.wtype) && r.wtype in WIRE_TYPES ? (r.wtype as keyof typeof WIRE_TYPES) : 'prises',
-        circuit: str(r.circuit),
+        breaker: breakerOf(r, legacy),
       };
     case 'symbol':
       if (!isStr(r.kind) || !isNum(r.x) || !isNum(r.y)) return null;
@@ -78,7 +91,8 @@ function parseItem(raw: unknown): Item | null {
         y: r.y,
         rot: toRotation(r.rot),
         label: isStr(r.label) ? r.label : '',
-        circuit: str(r.circuit),
+        breaker: breakerOf(r, legacy),
+        board: isNum(r.board) ? r.board : null,
         height: isNum(r.height) && r.height >= 0 && r.height <= 400 ? Math.round(r.height) : null,
       };
     case 'text':
@@ -94,8 +108,10 @@ export function parseDoc(raw: unknown): Doc {
   if (typeof raw !== 'object' || raw === null) throw new Error('Document invalide');
   const r = raw as Record<string, unknown>;
   if (!Array.isArray(r.items)) throw new Error('Document invalide : liste d’éléments manquante');
-  const items = r.items.map(parseItem).filter((i): i is Item => i !== null);
+  const legacy = new Map<number, string>();
+  const items = r.items.map((i) => parseItem(i, legacy)).filter((i): i is Item => i !== null);
   const boards = parseBoards(r.boards);
+  resolveLinks(items, boards, legacy);
   const maxId = Math.max(
     items.reduce((m, i) => Math.max(m, i.id), 0),
     ...boards.flatMap((b) => [b.id, ...b.devices.map((d) => d.id)]),
@@ -107,4 +123,33 @@ export function parseDoc(raw: unknown): Doc {
     scale: isNum(r.scale) && r.scale >= MIN_SCALE && r.scale <= MAX_SCALE ? r.scale : DEFAULT_SCALE,
     nextId: Math.max(maxId + 1, isNum(r.nextId) ? r.nextId : isNum(r.nid) ? r.nid : 1),
   };
+}
+
+/**
+ * Valide les liens du plan vers les tableaux : un disjoncteur ou un tableau qui n'existe plus est
+ * oublié, et un ancien repère saisi à la main est résolu sur le premier tableau.
+ */
+function resolveLinks(items: Item[], boards: Board[], legacy: Map<number, string>): void {
+  const devices = new Set(boards.flatMap((b) => b.devices.map((d) => d.id)));
+  const boardIds = new Set(boards.map((b) => b.id));
+  const first = boards[0];
+  const refs = new Map<string, number>();
+  if (first) {
+    const a = analyze(first);
+    for (const d of a.circuits) {
+      const ref = a.refs.get(d.id);
+      if (ref) refs.set(ref, d.id);
+    }
+  }
+
+  for (const it of items) {
+    if (it.type !== 'wire' && it.type !== 'symbol') continue;
+    if (it.breaker !== null && !devices.has(it.breaker)) it.breaker = null;
+    if (it.breaker === null) {
+      const old = legacy.get(it.id);
+      const found = old ? refs.get(old) : undefined;
+      if (found !== undefined) it.breaker = found;
+    }
+    if (it.type === 'symbol' && it.board !== null && !boardIds.has(it.board)) it.board = null;
+  }
 }

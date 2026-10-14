@@ -1,13 +1,15 @@
-import type { NewItem, Point, RoomKind, Rotation, WireTypeId } from '../types';
+import type { Board } from '../board/types';
+import type { Item, NewItem, Point, Room, RoomKind, Rotation, WireTypeId } from '../types';
+import { roomAt } from './metrics';
 
 const room = (x: number, y: number, w: number, h: number, label: string, kind: RoomKind): NewItem => ({
   type: 'room', x, y, w, h, label, kind, parts: [],
 });
 const wall = (...points: Point[]): NewItem => ({ type: 'wall', points });
 const sym = (kind: string, x: number, y: number, rot: Rotation = 0, label = ''): NewItem => ({
-  type: 'symbol', kind, x, y, rot, label, circuit: '', height: null,
+  type: 'symbol', kind, x, y, rot, label, breaker: null, board: null, height: null,
 });
-const wire = (wtype: WireTypeId, ...points: Point[]): NewItem => ({ type: 'wire', points, wtype, circuit: '' });
+const wire = (wtype: WireTypeId, ...points: Point[]): NewItem => ({ type: 'wire', points, wtype, breaker: null });
 
 /**
  * Appartement d'exemple d'environ 76 m² (échelle 0,5 m par carreau), pour démarrer avec
@@ -79,4 +81,28 @@ export function examplePlan(): { name: string; items: NewItem[] } {
     wire('special', [270, 310], [280, 310], [280, 200], [360, 200], [360, 160], [370, 160]),
   ];
   return { name: 'Appartement (exemple)', items };
+}
+
+/**
+ * Raccorde l'appartement d'exemple au tableau d'exemple (modèle « logement ») : chaque câble et
+ * chaque appareil au disjoncteur qui lui correspond, et le symbole du tableau au tableau lui-même.
+ */
+export function linkExample(items: Item[], board: Board): void {
+  const byLabel = new Map(board.devices.filter((d) => d.label).map((d) => [d.label, d.id] as const));
+  const pick = (label: string): number | null => byLabel.get(label) ?? null;
+  const rooms = items.filter((i): i is Room => i.type === 'room');
+
+  for (const it of items) {
+    if (it.type === 'wire') {
+      it.breaker = pick(it.wtype === 'eclairage' ? 'Éclairage' : it.wtype === 'special' ? 'Plaque de cuisson' : 'Prises chambres');
+    } else if (it.type === 'symbol') {
+      if (it.kind === 'tableau') it.board = board.id;
+      else if (['lampe', 'applique', 'spot', 'inter', 'va', 'poussoir'].includes(it.kind)) it.breaker = pick('Éclairage');
+      else if (it.kind === 'prise_s') it.breaker = pick('Plaque de cuisson');
+      else if (it.kind === 'prise' || it.kind === 'rj45') {
+        const kind = roomAt(rooms, it.x, it.y)?.kind;
+        it.breaker = pick(kind === 'sejour' ? 'Prises séjour' : kind === 'cuisine' ? 'Prises cuisine' : 'Prises chambres');
+      }
+    }
+  }
 }

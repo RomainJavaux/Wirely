@@ -2,6 +2,7 @@ import { USAGES } from '../domain/board/catalog';
 import { bomLines, circuitRows, circuitsCsv, outputRows } from '../domain/board/bom';
 import { analyze, effectiveUsage } from '../domain/board/layout';
 import type { Board } from '../domain/board/types';
+import { allLinks, linksSummary } from '../domain/link/links';
 import type { Doc } from '../domain/types';
 import { renderBoard } from '../render/board/boardSvg';
 import { renderUnifilaire } from '../render/board/unifilaire';
@@ -27,7 +28,7 @@ function usageLegend(board: Board): string {
 }
 
 /** Découpe la fiche du tableau en sections : face avant, unifilaire, circuits, sorties, nomenclature. */
-export function buildBoardSections(board: Board): SheetSection[] {
+export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
   const sections: SheetSection[] = [];
 
   const front = renderBoard(board, { interactive: false });
@@ -45,17 +46,18 @@ export function buildBoardSections(board: Board): SheetSection[] {
     sections.push({ title: 'Schéma unifilaire', ...uni });
   }
 
-  const circuits = circuitRows(board);
+  const circuits = circuitRows(board, wiredText(doc));
   if (circuits.length > 0) {
     const t = table(1200, [
-      { title: 'Repère', frac: 0.06, get: (r) => r.ref },
-      { title: 'Désignation', frac: 0.2, get: (r) => r.label },
-      { title: 'Destination', frac: 0.15, get: (r) => r.dest },
-      { title: 'Protection', frac: 0.15, get: (r) => `${r.device} ${r.protection}` },
-      { title: 'Différentiel amont', frac: 0.17, get: (r) => r.rcd },
-      { title: 'Section', frac: 0.08, get: (r) => r.section },
-      { title: 'Usage', frac: 0.11, get: (r) => r.usage },
-      { title: 'Remarque', frac: 0.15, get: (r) => r.note },
+      { title: 'Repère', frac: 0.05, get: (r) => r.ref },
+      { title: 'Désignation', frac: 0.16, get: (r) => r.label },
+      { title: 'Destination', frac: 0.11, get: (r) => r.dest },
+      { title: 'Protection', frac: 0.14, get: (r) => `${r.device} ${r.protection}` },
+      { title: 'Différentiel amont', frac: 0.14, get: (r) => r.rcd },
+      { title: 'Section', frac: 0.07, get: (r) => r.section },
+      { title: 'Usage', frac: 0.09, get: (r) => r.usage },
+      { title: 'Raccordé au plan', frac: 0.18, get: (r) => r.wired },
+      { title: 'Remarque', frac: 0.06, get: (r) => r.note },
     ], circuits);
     sections.push({ title: 'Repérage des circuits', svg: t.svg, width: 1200, height: t.height });
   }
@@ -92,6 +94,16 @@ export function buildBoardSections(board: Board): SheetSection[] {
   return sections;
 }
 
+/** Résumé de ce qui est raccordé à chaque disjoncteur sur le plan, pour les tableaux de la fiche. */
+function wiredText(doc?: Doc): (deviceId: number) => string {
+  if (!doc) return () => '';
+  const links = allLinks(doc);
+  return (id) => {
+    const l = links.get(id);
+    return l ? linksSummary(l) : '';
+  };
+}
+
 const supplyLabel = (b: Board): string => (b.supply === 'tri' ? 'Triphasé 400 V' : 'Monophasé 230 V');
 
 const sheetHeader = (doc: Doc, board: Board, date: Date) => ({
@@ -99,7 +111,7 @@ const sheetHeader = (doc: Doc, board: Board, date: Date) => ({
   subtitle: [board.location, supplyLabel(board), `Projet : ${doc.name}`, date.toLocaleDateString('fr-FR')]
     .filter(Boolean)
     .join(' · '),
-  sections: buildBoardSections(board),
+  sections: buildBoardSections(board, doc),
 });
 
 /** Fiche complète en un seul SVG autonome (PNG / SVG). */
@@ -113,8 +125,11 @@ export const exportBoardSvg = (doc: Doc, board: Board): void =>
 export const exportBoardPng = (doc: Doc, board: Board): void =>
   downloadPng(buildBoardSheetSvg(doc, board), safeName(board.name, 'png'));
 
-export const exportBoardCsv = (board: Board): void =>
-  downloadBlob(new Blob([circuitsCsv(board)], { type: 'text/csv;charset=utf-8' }), safeName(`${board.name} - circuits`, 'csv'));
+export const exportBoardCsv = (doc: Doc, board: Board): void =>
+  downloadBlob(
+    new Blob([circuitsCsv(board, wiredText(doc))], { type: 'text/csv;charset=utf-8' }),
+    safeName(`${board.name} - circuits`, 'csv'),
+  );
 
 /** PDF : une section par bloc, sans coupure au milieu d'un tableau. */
 export function exportBoardPdf(doc: Doc, board: Board): void {

@@ -6,6 +6,9 @@ import { toolMeta } from '../tools/meta';
 import type { PointerInfo } from '../tools/tool';
 import type { ToolManager } from '../tools/toolManager';
 import { snap } from '../domain/geometry';
+import { openBoard } from '../core/links';
+import { circuitInfo, itemsOfCircuit } from '../domain/link/links';
+import { unionBounds } from '../domain/geometry';
 import { renderScene } from './items';
 
 interface PanState {
@@ -37,7 +40,14 @@ export class CanvasView {
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e));
     svg.addEventListener('pointerup', (e) => this.onPointerUp(e));
-    svg.addEventListener('dblclick', () => this.tools.active.finish());
+    svg.addEventListener('dblclick', (e) => {
+      this.tools.active.finish();
+      // Double-clic sur le symbole d'un tableau lié : on ouvre le tableau.
+      if (this.store.state.tool !== 'select') return;
+      const id = (e.target as Element).closest('[data-id]')?.getAttribute('data-id');
+      const item = id == null ? undefined : this.store.getItem(Number(id));
+      if (item?.type === 'symbol' && item.board !== null) openBoard(this.store, item.board);
+    });
     svg.addEventListener('contextmenu', (e) => e.preventDefault());
     svg.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     window.addEventListener('resize', () => this.render());
@@ -60,10 +70,13 @@ export class CanvasView {
 
   render(): void {
     this.tools.sync();
-    const { doc, selection, view } = this.store.state;
+    const { doc, selection, view, activeCircuit } = this.store.state;
+    if (this.applyFocusRequest()) return; // le cadrage relance un rendu
     const scene = renderScene(doc, {
       interactive: true,
       selectedId: selection,
+      circuits: circuitInfo(doc),
+      activeCircuit,
       scale: view.dims ? doc.scale : undefined,
       hide: { wires: !view.wires, symbols: !view.symbols, texts: !view.texts },
     });
@@ -76,6 +89,32 @@ export class CanvasView {
     this.svg.querySelector('#gridS')?.setAttribute('patternTransform', pattern);
     this.svg.querySelector('#gridL')?.setAttribute('patternTransform', pattern);
     this.applyCursor();
+  }
+
+  private lastFocusSeq = 0;
+
+  /**
+   * Cadre la vue sur le circuit ou l'élément demandé (« voir sur le plan »). La demande n'est
+   * consommée que lorsque le canevas a une taille exploitable (il peut être encore masqué).
+   */
+  private applyFocusRequest(): boolean {
+    const req = this.store.state.planFocus;
+    if (!req || req.seq === this.lastFocusSeq) return false;
+    const { width, height } = this.size;
+    if (width < 120 || height < 120) return false;
+    this.lastFocusSeq = req.seq;
+
+    const { doc } = this.store.state;
+    const items = req.itemId !== null
+      ? doc.items.filter((i) => i.id === req.itemId)
+      : req.circuit !== null
+        ? itemsOfCircuit(doc, req.circuit)
+        : [];
+    const b = unionBounds(items);
+    if (!b) return false;
+    const pad = 70;
+    this.viewport.fit({ x0: b.x0 - pad, y0: b.y0 - pad, x1: b.x1 + pad, y1: b.y1 + pad }, width, height);
+    return true;
   }
 
   private applyCursor(): void {

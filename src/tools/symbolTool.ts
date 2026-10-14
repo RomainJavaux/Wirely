@@ -8,6 +8,6 @@ export class SymbolTool extends BaseTool {
   override pointerDown(p: PointerInfo): void {
     const kind = this.ctx.store.state.symbolKind;
     if (!kind) return;
-    addItem(this.ctx.store, { type: 'symbol', kind, x: p.snapped[0], y: p.snapped[1], rot: 0, label: '', circuit: '', height: null });
+    addItem(this.ctx.store, { type: 'symbol', kind, x: p.snapped[0], y: p.snapped[1], rot: 0, label: '', breaker: null, board: null, height: null });
   }
 }

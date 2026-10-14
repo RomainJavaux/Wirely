@@ -1,5 +1,6 @@
 import type { Store } from '../core/store';
 import type { Tool, ToolContext } from './tool';
+import { AssignTool } from './assignTool';
 import { PolylineTool } from './polylineTool';
 import { RoomTool } from './roomTool';
 import { SelectTool } from './selectTool';
@@ -22,6 +23,7 @@ export class ToolManager {
       new PolylineTool(ctx, 'wire'),
       new SymbolTool(ctx),
       new TextTool(ctx),
+      new AssignTool(ctx),
     ];
     this.tools = new Map(all.map((t) => [t.id, t]));
     this.current = this.tools.get(store.state.tool) as Tool;

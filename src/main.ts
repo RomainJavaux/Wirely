@@ -37,6 +37,7 @@ function bootstrap(): void {
     focusLabel: () => properties.focusLabel(),
   };
 
+  new ModeSwitch(store); // avant les vues : le plan doit être visible quand elles mesurent leur taille
   const tools = new ToolManager(store, ctx);
   canvas = new CanvasView(svg, store, viewport, tools);
   properties = new PropertiesPanel(store);
@@ -49,7 +50,6 @@ function bootstrap(): void {
   const auth = new Auth();
   const cloud = new Cloud(store, auth);
 
-  new ModeSwitch(store);
   new BoardWorkspace(store);
   new Sidebar(store);
   new CloudBar(auth, cloud);

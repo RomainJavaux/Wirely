@@ -45,6 +45,8 @@
     <aside class="left">
       <h3>Outils</h3>
       <div class="tools" id="tools"></div>
+      <h3>Circuit actif</h3>
+      <div id="activeCircuitBox"></div>
       <h3>Type de câble</h3>
       <div class="wires" id="wireTypes"></div>
       <div id="palette"></div>
@@ -128,6 +130,11 @@
             <button id="bRowPlus" title="Ajouter un rail">+</button>
           </span>
           <button id="bCompact" title="Aligner les appareils à gauche, sans trous">Compacter</button>
+          <span class="sep"></span>
+          <label class="planlink" title="Symbole « tableau » du plan qui représente ce tableau">Plan
+            <select id="bPlan" aria-label="Symbole du plan lié à ce tableau"></select>
+          </label>
+          <button id="bPlanGo" title="Voir ce symbole sur le plan">↗</button>
           <span class="spacer"></span>
           <div class="seg">
             <button id="bViewFront" class="active">Face avant</button>

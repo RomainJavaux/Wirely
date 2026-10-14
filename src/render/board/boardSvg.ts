@@ -30,12 +30,26 @@ export interface BoardRenderOptions {
   ghost?: Ghost | null;
   /** Appareil en cours de déplacement (affiché estompé à sa place d'origine). */
   dragId?: number | null;
+  /** Nombre d'éléments du plan raccordés à chaque appareil (pastille sur l'appareil). */
+  badges?: ReadonlyMap<number, number>;
+  /** Appareils qui répondent à une recherche : les autres sont mis en retrait. null : pas de recherche. */
+  highlight?: ReadonlySet<number> | null;
 }
 
 export interface RenderedBoard {
   svg: string;
   width: number;
   height: number;
+}
+
+/** Zone occupée par un appareil et son étiquette, en unités du plan du tableau (pour le cadrage). */
+export function deviceBox(device: Device): { x: number; y: number; w: number; h: number } {
+  return {
+    x: slotX(device.col),
+    y: deviceTop(device.row),
+    w: deviceWidth(device) * MOD_W,
+    h: DEV_H + 6 + STRIP_H,
+  };
 }
 
 export const boardWidth = (board: Board): number => PAD_X * 2 + board.cols * MOD_W;
@@ -186,12 +200,21 @@ export function renderBoard(board: Board, opts: BoardRenderOptions): RenderedBoa
     const y = deviceTop(d.row);
     const selected = opts.interactive && d.id === opts.selectedId;
     const dragging = opts.dragId === d.id;
+    const dimmed = opts.highlight != null && !opts.highlight.has(d.id);
     const attr = opts.interactive ? ` data-dev="${d.id}" style="cursor:grab"` : '';
-    s += `<g${attr}${dragging ? ' opacity=".3"' : ''}><g transform="translate(${x} ${y})">${deviceGlyph(d, def)}</g>`;
+    s += `<g${attr}${dragging ? ' opacity=".3"' : dimmed ? ' opacity=".18"' : ''}><g transform="translate(${x} ${y})">${deviceGlyph(d, def)}</g>`;
     if (def.id !== 'vide') s += labelStrip(d, def, a.refs.get(d.id) ?? '', x, y + DEV_H + 6, selected);
     if (selected) {
       const w = deviceWidth(d) * MOD_W;
       s += `<rect x="${x - 1}" y="${y - 2}" width="${w}" height="${DEV_H + 4}" rx="5" fill="none" stroke="${ACCENT}" stroke-width="2.5"/>`;
+    }
+    // Pastille : nombre de lignes du plan raccordées à ce disjoncteur.
+    const count = opts.badges?.get(d.id);
+    if (count) {
+      const bx = x + deviceWidth(d) * MOD_W - 8;
+      s +=
+        `<circle cx="${bx}" cy="${y - 1}" r="8.5" fill="#0f172a" stroke="#fff" stroke-width="1.5"/>` +
+        `<text x="${bx}" y="${y + 2.3}" font-size="9.5" font-weight="700" font-family="${FONT}" text-anchor="middle" fill="#fff">${count > 99 ? '99+' : count}</text>`;
     }
     s += `</g>`;
   }

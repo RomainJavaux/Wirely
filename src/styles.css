@@ -460,3 +460,65 @@ ul.parts li {
   font-size: 12.5px;
 }
 ul.parts button { padding: 3px 8px; font-size: 12px; }
+
+/* ---------- Circuit actif, liens plan <-> tableau ---------- */
+.ac { display: flex; gap: 6px; }
+.ac input { flex: 1; min-width: 0; }
+#acInfo { margin-top: 6px; font-size: 12.5px; }
+#acInfo .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+
+label.planlink { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+label.planlink select { max-width: 190px; }
+
+.side-tabs { display: flex; margin-bottom: 10px; }
+.side-tabs button { flex: 1; }
+.badge { background: #eef1f6; border-radius: 999px; padding: 0 7px; font-size: 11px; margin-left: 4px; }
+.side-tabs button.active .badge { background: #fff; }
+
+.tiles-wrap { grid-template-columns: repeat(2, 1fr); }
+
+.ctab input[type=search] { width: 100%; margin-bottom: 6px; }
+details.grp { border-bottom: 1px solid var(--line); }
+details.grp > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0b3d91;
+  padding: 8px 2px 4px;
+}
+details.grp > summary::-webkit-details-marker { display: none; }
+details.grp > summary::before { content: '▸'; width: 10px; transition: transform .15s; }
+details.grp[open] > summary::before { transform: rotate(90deg); }
+details.grp .count { margin-left: auto; font-weight: 400; background: #eef1f6; border-radius: 999px; padding: 0 7px; color: var(--muted); }
+.grp-info { margin: 0 0 4px 14px; font-size: 11.5px; }
+
+ul.circs { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 2px; }
+li.circ {
+  display: grid;
+  grid-template-columns: 10px 22px 1fr auto;
+  grid-template-areas: 'dot ref name go' '. . wired go';
+  gap: 0 6px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  align-items: center;
+}
+li.circ:hover { background: #f1f4f9; }
+li.circ.active { background: var(--accent-soft); outline: 1px solid var(--accent); }
+li.circ[hidden] { display: none; }
+li.circ .dot { grid-area: dot; width: 9px; height: 9px; border-radius: 50%; }
+li.circ .ref { grid-area: ref; font-weight: 700; font-size: 12px; text-align: right; }
+li.circ .name { grid-area: name; display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+li.circ .name b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+li.circ .name small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+li.circ .wired { grid-area: wired; font-size: 11px; color: #15803d; }
+li.circ .wired.none { color: #b45309; font-style: italic; }
+li.circ .go { grid-area: go; padding: 2px 7px; }
+
+ul.items { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; font-size: 12.5px; }
+ul.items li { padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+ul.items li:hover { background: #f1f4f9; }

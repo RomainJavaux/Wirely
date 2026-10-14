@@ -55,8 +55,11 @@ export interface Wire {
   type: 'wire';
   points: Point[];
   wtype: WireTypeId;
-  /** Repère du circuit du tableau qui alimente ce câble (texte libre, ex. « 3 »). */
-  circuit: string;
+  /**
+   * Disjoncteur qui alimente ce câble : identifiant de l'appareil dans un tableau (null : non raccordé).
+   * L'identifiant, contrairement au repère affiché (1, 2, 3…), ne change pas quand on réorganise le tableau.
+   */
+  breaker: number | null;
 }
 
 export interface SymbolItem {
@@ -67,8 +70,10 @@ export interface SymbolItem {
   y: number;
   rot: Rotation;
   label: string;
-  /** Repère du circuit du tableau qui alimente cet appareil. */
-  circuit: string;
+  /** Disjoncteur qui alimente cet appareil (identifiant de l'appareil dans un tableau). */
+  breaker: number | null;
+  /** Pour un symbole « tableau » : tableau électrique qu'il représente. */
+  board: number | null;
   /** Hauteur de pose en cm (null : non précisée). */
   height: number | null;
 }

@@ -1,7 +1,21 @@
 import type { Board, DeviceKind } from '../domain/board/types';
+import { locateDevice } from '../domain/link/links';
 import type { Doc, Item, SymbolKind, WireTypeId } from '../domain/types';
 
-export type ToolId = 'select' | 'room' | 'wall' | 'wire' | 'symbol' | 'text';
+export type ToolId = 'select' | 'room' | 'wall' | 'wire' | 'symbol' | 'text' | 'assign';
+
+/** Demande de cadrage du plan sur un circuit ou un élément (consommée une fois par la vue). */
+export interface PlanFocus {
+  seq: number;
+  circuit: number | null;
+  itemId: number | null;
+}
+
+/** Demande de défilement du tableau vers un appareil. */
+export interface BoardFocus {
+  seq: number;
+  deviceId: number;
+}
 
 /** Mode d'édition : plan de la maison ou tableau électrique. */
 export type Mode = 'plan' | 'board';
@@ -35,6 +49,15 @@ export interface AppState {
   armedKind: DeviceKind | null;
   /** Fusion de pièces en cours : pièce qui absorbera la prochaine pièce cliquée. */
   mergeFrom: number | null;
+  /**
+   * Circuit actif : disjoncteur auquel se raccordent les éléments créés ou affectés, et qui est mis
+   * en évidence sur le plan (le reste est atténué).
+   */
+  activeCircuit: number | null;
+  planFocus: PlanFocus | null;
+  boardFocus: BoardFocus | null;
+  /** Texte de recherche des circuits du tableau (met en retrait ce qui ne correspond pas). */
+  boardFilter: string;
 }
 
 type Listener = () => void;
@@ -70,6 +93,10 @@ export class Store {
       deviceSelection: null,
       armedKind: null,
       mergeFrom: null,
+      activeCircuit: null,
+      planFocus: null,
+      boardFocus: null,
+      boardFilter: '',
     };
     this.history = [JSON.stringify(doc)];
   }
@@ -168,6 +195,8 @@ export class Store {
     this.state.selection = null;
     this.state.deviceSelection = null;
     this.state.mergeFrom = null;
+    this.state.activeCircuit = null;
+    this.state.boardFilter = '';
     this.state.boardId = doc.boards[0]?.id ?? null;
     this.history = [JSON.stringify(doc)];
     this.cursor = 0;
@@ -189,6 +218,7 @@ export class Store {
     if (this.getItem(this.state.selection) === undefined) this.state.selection = null;
     if (this.getItem(this.state.mergeFrom) === undefined) this.state.mergeFrom = null;
     this.fixBoardSelection();
+    if (locateDevice(this.state.doc, this.state.activeCircuit) === null) this.state.activeCircuit = null;
     this.revision++;
     this.notify();
   }

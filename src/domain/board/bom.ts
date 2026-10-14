@@ -55,11 +55,13 @@ export interface CircuitRow {
   rcd: string;
   section: string;
   usage: string;
+  /** Ce qui est raccordé à ce disjoncteur sur le plan (« 6 prises · 12,4 m »). */
+  wired: string;
   note: string;
 }
 
 /** Tableau de repérage des circuits (un par disjoncteur / disjoncteur différentiel). */
-export function circuitRows(board: Board): CircuitRow[] {
+export function circuitRows(board: Board, wired: (deviceId: number) => string = () => ''): CircuitRow[] {
   const a = analyze(board);
   return a.circuits.map((d) => {
     const rcd = a.protectedBy.get(d.id) ?? null;
@@ -73,6 +75,7 @@ export function circuitRows(board: Board): CircuitRow[] {
       rcd: rcd ? (rcd.id === d.id ? 'intégré' : `${a.refs.get(rcd.id)} · ${deviceSpec(rcd)}`) : '—',
       section: section === null ? '' : fmtSection(section),
       usage: USAGES[effectiveUsage(d)].name,
+      wired: wired(d.id),
       note: d.note,
     };
   });
@@ -81,10 +84,10 @@ export function circuitRows(board: Board): CircuitRow[] {
 const csvCell = (v: string): string => (/[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
 /** CSV (séparateur « ; », UTF-8 avec BOM) ouvrable directement dans Excel. */
-export function circuitsCsv(board: Board): string {
-  const head = ['Repère', 'Désignation', 'Destination', 'Appareil', 'Protection', 'Différentiel amont', 'Section', 'Usage', 'Remarque'];
-  const rows = circuitRows(board).map((r) =>
-    [r.ref, r.label, r.dest, r.device, r.protection, r.rcd, r.section, r.usage, r.note].map(csvCell).join(';'),
+export function circuitsCsv(board: Board, wired: (deviceId: number) => string = () => ''): string {
+  const head = ['Repère', 'Désignation', 'Destination', 'Appareil', 'Protection', 'Différentiel amont', 'Section', 'Usage', 'Raccordé au plan', 'Remarque'];
+  const rows = circuitRows(board, wired).map((r) =>
+    [r.ref, r.label, r.dest, r.device, r.protection, r.rcd, r.section, r.usage, r.wired, r.note].map(csvCell).join(';'),
   );
   return '﻿' + [head.join(';'), ...rows].join('\r\n') + '\r\n';
 }

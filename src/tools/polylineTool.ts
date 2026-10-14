@@ -40,7 +40,7 @@ export class PolylineTool extends BaseTool {
     if (points.length < 2) return;
     const { store } = this.ctx;
     if (this.id === 'wall') addItem(store, { type: 'wall', points });
-    else addItem(store, { type: 'wire', points, wtype: store.state.wireType, circuit: '' });
+    else addItem(store, { type: 'wire', points, wtype: store.state.wireType, breaker: null });
   }
 
   override cancel(): void {

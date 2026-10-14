@@ -11,6 +11,7 @@ import {
   minCols,
 } from '../domain/board/layout';
 import { buildBoard, type BoardTemplate } from '../domain/board/templates';
+import { clearBoardLinks, clearLinks } from '../domain/link/links';
 import type { Board, Device } from '../domain/board/types';
 import type { Store } from './store';
 
@@ -39,6 +40,10 @@ export function deleteActiveBoard(store: Store): void {
   const id = store.state.boardId;
   if (id === null) return;
   const doc = store.state.doc;
+  const board = doc.boards.find((b) => b.id === id);
+  // Le plan ne doit pas garder de lien vers ce tableau ni vers ses disjoncteurs.
+  if (board) clearLinks(doc, new Set(board.devices.map((d) => d.id)));
+  clearBoardLinks(doc, id);
   doc.boards = doc.boards.filter((b) => b.id !== id);
   store.state.boardId = doc.boards[0]?.id ?? null;
   store.state.deviceSelection = null;
@@ -86,7 +91,9 @@ export function removeDevice(store: Store, id: number): void {
   const board = store.activeBoard;
   if (!board) return;
   store.updateBoard({ ...board, devices: board.devices.filter((d) => d.id !== id) });
+  clearLinks(store.state.doc, new Set([id])); // les câbles et appareils du plan redeviennent non raccordés
   if (store.state.deviceSelection === id) store.state.deviceSelection = null;
+  if (store.state.activeCircuit === id) store.state.activeCircuit = null;
   store.commit();
 }
 

@@ -14,7 +14,11 @@ import type { Store } from '../../core/store';
 import { getDeviceDef } from '../../domain/board/catalog';
 import { MAX_COLS, MIN_COLS, canPlace, createDevice, deviceWidth, lastUsedRow, minCols } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
-import { boardWidth, renderBoard, slotFromPoint, type Ghost } from '../../render/board/boardSvg';
+import { linkSymbolToBoard, showItemOnPlan } from '../../core/links';
+import { linkBadges, matchingDevices, symbolOfBoard, tableauSymbols } from '../../domain/link/links';
+import { roomAt, roomsOf } from '../../domain/plan/metrics';
+import { getRoomKind } from '../../domain/plan/roomKinds';
+import { boardWidth, deviceBox, renderBoard, slotFromPoint, type Ghost } from '../../render/board/boardSvg';
 import { renderUnifilaire } from '../../render/board/unifilaire';
 import { esc } from '../../util/escape';
 import { isTyping, qs } from '../dom';
@@ -42,6 +46,7 @@ export class BoardWorkspace {
   private dragId: number | null = null;
   private gesture: Gesture | null = null;
   private natural = { w: 1, h: 1 };
+  private lastFocusSeq = 0;
 
   private readonly host = qs<HTMLElement>('#boardHost');
   private readonly scroll = qs<HTMLElement>('#boardScroll');
@@ -115,6 +120,24 @@ export class BoardWorkspace {
     qs<HTMLButtonElement>('#bRowMinus').onclick = () => setRows(store, (store.activeBoard?.rows ?? 1) - 1);
     qs<HTMLButtonElement>('#bRowPlus').onclick = () => setRows(store, (store.activeBoard?.rows ?? 1) + 1);
     qs<HTMLButtonElement>('#bCompact').onclick = () => compactBoard(store);
+
+    // Lien avec le plan : quel symbole « tableau » représente ce tableau.
+    const planSel = qs<HTMLSelectElement>('#bPlan');
+    planSel.onchange = () => {
+      const board = store.activeBoard;
+      if (!board) return;
+      const current = symbolOfBoard(store.state.doc, board.id);
+      if (planSel.value === '') {
+        if (current) linkSymbolToBoard(store, current.id, null);
+      } else {
+        linkSymbolToBoard(store, Number(planSel.value), board.id);
+      }
+    };
+    qs<HTMLButtonElement>('#bPlanGo').onclick = () => {
+      const board = store.activeBoard;
+      const symbol = board ? symbolOfBoard(store.state.doc, board.id) : undefined;
+      if (symbol) showItemOnPlan(store, symbol.id);
+    };
 
     qs<HTMLButtonElement>('#bViewFront').onclick = () => this.setView('front');
     qs<HTMLButtonElement>('#bViewUni').onclick = () => this.setView('uni');
@@ -319,6 +342,9 @@ export class BoardWorkspace {
       this.needFit = true;
       this.customCols = false;
     }
+    // Une demande de « voir cet appareil » : la face avant seule permet de le montrer.
+    const focus = store.state.boardFocus;
+    if (focus && focus.seq !== this.lastFocusSeq && this.view === 'uni') this.view = 'front';
 
     this.syncToolbar(board);
 
@@ -330,9 +356,12 @@ export class BoardWorkspace {
         selectedId: store.state.deviceSelection,
         ghost: this.ghost,
         dragId: this.dragId,
+        badges: linkBadges(store.state.doc),
+        highlight: matchingDevices(store.state.doc, board, store.state.boardFilter),
       });
       this.natural = { w: r.width, h: r.height };
       this.host.innerHTML = this.wrap(r.svg, r.width, r.height);
+      this.applyFocusRequest(board);
     } else {
       const r = renderUnifilaire(board);
       this.natural = { w: r.width, h: r.height };
@@ -347,6 +376,22 @@ export class BoardWorkspace {
         : armed
           ? `Cliquez sur un rail pour poser « ${armed.name} » (Échap pour annuler).`
           : 'Glissez un appareil depuis la palette sur un rail · cliquez-en un pour le régler · ← → pour le décaler.';
+  }
+
+  /** Fait défiler la face avant jusqu'à l'appareil demandé (« voir au tableau », liste des circuits). */
+  private applyFocusRequest(board: Board): void {
+    const req = this.store.state.boardFocus;
+    if (!req || req.seq === this.lastFocusSeq) return;
+    if (this.scroll.clientWidth < 50) return; // pas encore visible : on réessaiera au prochain rendu
+    this.lastFocusSeq = req.seq;
+    const device = board.devices.find((d) => d.id === req.deviceId);
+    if (!device) return;
+
+    const box = deviceBox(device);
+    const z = this.zoom;
+    const left = box.x * z - (this.scroll.clientWidth - box.w * z) / 2;
+    const top = box.y * z - (this.scroll.clientHeight - box.h * z) / 2;
+    this.scroll.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: 'smooth' });
   }
 
   private wrap(inner: string, w: number, h: number): string {
@@ -393,6 +438,25 @@ export class BoardWorkspace {
         ? `Minimum ${need} : les appareils posés occupent ${need} modules sur leur rail le plus rempli.`
         : `Entre ${MIN_COLS} et ${MAX_COLS} modules.`;
     if (document.activeElement !== this.colsEl) this.colsEl.value = String(board.cols);
+
+    // Symbole du plan lié à ce tableau
+    const { doc } = store.state;
+    const symbols = tableauSymbols(doc);
+    const rooms = roomsOf(doc.items);
+    const linked = symbolOfBoard(doc, board.id);
+    const planSel = qs<HTMLSelectElement>('#bPlan');
+    planSel.innerHTML =
+      `<option value="">${symbols.length === 0 ? 'aucun symbole « Tableau » sur le plan' : '— non lié —'}</option>` +
+      symbols
+        .map((sym) => {
+          const room = roomAt(rooms, sym.x, sym.y);
+          const where = room ? (room.label.trim() || getRoomKind(room.kind).name) : 'hors pièce';
+          const other = sym.board !== null && sym.board !== board.id ? ' (lié à un autre tableau)' : '';
+          return `<option value="${sym.id}"${sym.id === linked?.id ? ' selected' : ''}>${esc(sym.label.trim() || 'Tableau')} · ${esc(where)}${other}</option>`;
+        })
+        .join('');
+    planSel.disabled = symbols.length === 0;
+    qs<HTMLButtonElement>('#bPlanGo').disabled = !linked;
 
     qs('#bRows').textContent = String(board.rows);
     qs<HTMLButtonElement>('#bRowMinus').disabled = board.rows <= Math.max(1, lastUsedRow(board) + 1);
