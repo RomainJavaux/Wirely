@@ -5,7 +5,13 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
 
 ## Deux modes
 
-- **Plan** : pièces, murs, symboles (prises, interrupteurs, lampes…) et câbles par circuit.
+- **Plan** : pièces typées (séjour, cuisine, chambre… avec leur couleur), murs, symboles
+  (prises, interrupteurs, lampes, ouvertures…) et câbles par circuit, à l'**échelle** réelle.
+  Surfaces, cotes et longueurs de câble sont calculées ; un panneau de synthèse et des contrôles
+  indicatifs par pièce (prises, point lumineux, détecteur de fumée) aident à la conception.
+  Chaque symbole peut porter un circuit du tableau et une hauteur de pose.
+  Export : fiche avec plan coté et barre d'échelle, légende chiffrée, tableau des pièces et
+  nomenclature (PNG / SVG / PDF), plus CSV des pièces et de la nomenclature.
 - **Tableau** : rails DIN sur lesquels on pose des appareils modulaires (disjoncteurs,
   différentiels, contacteurs…). Un différentiel protège les disjoncteurs à sa droite sur le
   rail ; l'app en déduit la structure et génère la documentation :
@@ -52,6 +58,7 @@ Les dépendances vont toujours vers le bas : `ui` → `tools`/`render` → `core
 ```
 src/
   domain/    Modèle pur, sans DOM : types, géométrie, catalogue de symboles, validation
+    plan/    Plan : types de pièces, échelle et métriques, contrôles, exemple, exports CSV
     board/   Tableau électrique : appareils, placement sur rails, analyse, contrôles, nomenclature
   core/      Store (état + historique annuler/rétablir), viewport, actions (plan et tableau)
   render/    Rendu SVG des éléments (partagé éditeur/export) et vue canevas
@@ -75,7 +82,10 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
   déjà converties en coordonnées du plan. Ajouter un outil = une classe + une entrée dans
   `tools/meta.ts` et `ToolManager`.
 - **Rendu partagé** : `render/items.ts` produit le même SVG pour l'éditeur et l'export.
-- **Ajouter un symbole** : une ligne dans `domain/catalog.ts`.
+- **Ajouter un symbole** : une ligne dans `domain/catalog.ts` (pour une porte ou une fenêtre, `gap`
+  définit la coupure du mur : le symbole se pose directement sur la ligne du mur).
+- **Ajouter un type de pièce** : une entrée dans `domain/plan/roomKinds.ts` (couleur, prises
+  conseillées en fonction de la surface).
 - **Ajouter un appareil de tableau** : une entrée dans `domain/board/catalog.ts` (largeur par variante, calibres, rôle).
 - **Ajouter un module Niko (ou autre bus)** : même fichier, avec `system`, `ref`, `outputs`, `info` et
   `source` (lien vers la fiche constructeur). N'ajoutez une largeur que si elle figure dans une fiche ;
@@ -83,7 +93,7 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
 
 ## Format de fichier
 
-JSON : `{ name, nextId, items: [...], boards: [...] }`. Les fichiers sont validés et normalisés à
+JSON : `{ name, scale, nextId, items: [...], boards: [...] }` (`scale` : mètres par carreau). Les fichiers sont validés et normalisés à
 l'ouverture (`parseDoc`) ; les anciens fichiers (`nid`) restent lisibles.
 
 ## Déploiement (Hostinger, par git)

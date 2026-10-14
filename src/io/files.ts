@@ -1,4 +1,6 @@
-import { buildExportSvg } from './exporter';
+import { buildExportSvg, planSheetHeader } from './exporter';
+import { planBomCsv, planRoomsCsv } from '../domain/plan/export';
+import { sheetHtml } from './sheet';
 import { parseDoc } from '../domain/document';
 import type { Doc } from '../domain/types';
 import { esc } from '../util/escape';
@@ -61,13 +63,19 @@ export function saveJson(doc: Doc): void {
 export const exportSvg = (doc: Doc): void => downloadSvg(buildExportSvg(doc), fileName(doc, 'svg'));
 export const exportPng = (doc: Doc): void => downloadPng(buildExportSvg(doc), fileName(doc, 'png'));
 
+/** PDF : une section par bloc (plan, légende, tableaux), sans coupure au milieu d'un tableau. */
 export function exportPdf(doc: Doc): void {
-  printHtml(
-    doc.name,
-    '@page{size:A4 landscape;margin:10mm}body{margin:0;display:flex;justify-content:center}svg{max-width:100%;max-height:100vh;height:auto}',
-    buildExportSvg(doc),
-  );
+  const { css, body } = sheetHtml(planSheetHeader(doc));
+  printHtml(doc.name, css, body);
 }
+
+const csvBlob = (csv: string): Blob => new Blob([csv], { type: 'text/csv;charset=utf-8' });
+
+export const exportPlanRoomsCsv = (doc: Doc): void =>
+  downloadBlob(csvBlob(planRoomsCsv(doc)), safeName(`${doc.name} - pièces`, 'csv'));
+
+export const exportPlanBomCsv = (doc: Doc): void =>
+  downloadBlob(csvBlob(planBomCsv(doc)), safeName(`${doc.name} - nomenclature`, 'csv'));
 
 /** Lit un fichier .json choisi par l'utilisateur. Rejette si le contenu est invalide. */
 export function readDocFile(file: File): Promise<Doc> {

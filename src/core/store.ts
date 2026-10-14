@@ -6,6 +6,18 @@ export type ToolId = 'select' | 'room' | 'wall' | 'wire' | 'symbol' | 'text';
 /** Mode d'édition : plan de la maison ou tableau électrique. */
 export type Mode = 'plan' | 'board';
 
+/** Ce que le plan affiche (n'affecte pas le document ni les exports). */
+export interface ViewOptions {
+  grid: boolean;
+  /** Cotes des pièces (dimensions et surface). */
+  dims: boolean;
+  wires: boolean;
+  symbols: boolean;
+  texts: boolean;
+}
+
+export const DEFAULT_VIEW: ViewOptions = { grid: true, dims: true, wires: true, symbols: true, texts: true };
+
 export interface AppState {
   doc: Doc;
   /** Sélection dans le plan. */
@@ -14,6 +26,7 @@ export interface AppState {
   symbolKind: SymbolKind | null;
   wireType: WireTypeId;
   mode: Mode;
+  view: ViewOptions;
   /** Tableau en cours d'édition. */
   boardId: number | null;
   /** Appareil sélectionné dans le tableau. */
@@ -50,6 +63,7 @@ export class Store {
       symbolKind: null,
       wireType: 'prises',
       mode: 'plan',
+      view: { ...DEFAULT_VIEW },
       boardId: doc.boards[0]?.id ?? null,
       deviceSelection: null,
       armedKind: null,

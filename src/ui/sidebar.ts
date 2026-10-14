@@ -1,5 +1,5 @@
-import { setTool } from '../core/actions';
-import type { Store } from '../core/store';
+import { setScale, setTool } from '../core/actions';
+import type { Store, ViewOptions } from '../core/store';
 import { SYMBOLS, SYMBOL_CATEGORIES, WIRE_TYPES, WIRE_TYPE_IDS } from '../domain/catalog';
 import type { WireTypeId } from '../domain/types';
 import { GLYPH_ATTRS } from '../render/items';
@@ -12,11 +12,15 @@ export class Sidebar {
   private readonly toolsEl = qs<HTMLElement>('#tools');
   private readonly wiresEl = qs<HTMLElement>('#wireTypes');
   private readonly paletteEl = qs<HTMLElement>('#palette');
+  private readonly viewEl = qs<HTMLElement>('#viewOpts');
+  private readonly scaleEl = qs<HTMLElement>('#scaleBox');
 
   constructor(private readonly store: Store) {
     this.buildTools();
     this.buildWireTypes();
     this.buildPalette();
+    this.buildView();
+    this.buildScale();
     store.subscribe(() => this.sync());
     this.sync();
   }
@@ -57,7 +61,7 @@ export class Sidebar {
       const buttons = SYMBOLS.filter((s) => s.category === cat)
         .map(
           (s) =>
-            `<button data-sym="${s.id}" title="${esc(s.name)}"><svg viewBox="-18 -18 36 36" ${GLYPH_ATTRS}>${s.svg}</svg>${esc(s.name)}</button>`,
+            `<button data-sym="${s.id}" title="${esc(s.name)}"><svg viewBox="${s.viewBox ?? '-18 -18 36 36'}" ${GLYPH_ATTRS}>${s.svg}</svg>${esc(s.name)}</button>`,
         )
         .join('');
       const count = SYMBOLS.filter((s) => s.category === cat).length;
@@ -72,8 +76,45 @@ export class Sidebar {
     });
   }
 
+  /** Cases à cocher : ce que le plan montre (n'affecte pas les exports). */
+  private buildView(): void {
+    const options: [keyof ViewOptions, string][] = [
+      ['grid', 'Grille'],
+      ['dims', 'Cotes'],
+      ['wires', 'Câbles'],
+      ['symbols', 'Symboles'],
+      ['texts', 'Textes'],
+    ];
+    this.viewEl.innerHTML = options
+      .map(([key, label]) => `<label><input type="checkbox" data-view="${key}"> ${esc(label)}</label>`)
+      .join('');
+    this.viewEl.addEventListener('change', (e) => {
+      const input = e.target as HTMLInputElement;
+      const key = input.dataset.view as keyof ViewOptions | undefined;
+      if (key) this.store.change((s) => (s.view[key] = input.checked));
+    });
+  }
+
+  private buildScale(): void {
+    this.scaleEl.innerHTML = `
+      <label class="scale">1 carreau =
+        <input type="number" id="scaleInput" min="0.05" max="5" step="0.05" aria-label="Mètres par carreau"> m
+      </label>
+      <p class="muted">Sert aux cotes, surfaces et longueurs de câble.</p>`;
+    const input = this.scaleEl.querySelector<HTMLInputElement>('#scaleInput') as HTMLInputElement;
+    input.onchange = () => {
+      setScale(this.store, Number(input.value));
+      input.value = String(this.store.state.doc.scale);
+    };
+  }
+
   private sync(): void {
-    const { tool, symbolKind, wireType } = this.store.state;
+    const { tool, symbolKind, wireType, view, doc } = this.store.state;
+    this.viewEl.querySelectorAll<HTMLInputElement>('[data-view]').forEach((i) => {
+      i.checked = view[i.dataset.view as keyof ViewOptions];
+    });
+    const scale = this.scaleEl.querySelector<HTMLInputElement>('#scaleInput');
+    if (scale && document.activeElement !== scale) scale.value = String(doc.scale);
     this.toolsEl.querySelectorAll<HTMLElement>('[data-tool]').forEach((b) =>
       b.classList.toggle('active', b.dataset.tool === tool),
     );

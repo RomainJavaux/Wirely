@@ -1,13 +1,21 @@
 import { parseBoards } from './board/parse';
 import { WIRE_TYPES } from './catalog';
-import type { Doc, Item, ItemType, Point, Rotation } from './types';
+import { DEFAULT_SCALE, MAX_SCALE, MIN_SCALE } from './plan/metrics';
+import { ROOM_KINDS } from './plan/roomKinds';
+import type { Doc, Item, ItemType, Point, Rotation, RoomKind } from './types';
 
 export const DEFAULT_NAME = 'Mon installation';
 
 /** Ordre de dessin : les pièces au fond, les textes au-dessus. */
 const DRAW_ORDER: readonly ItemType[] = ['room', 'wall', 'wire', 'symbol', 'text'];
 
-export const createDoc = (name = DEFAULT_NAME): Doc => ({ name, items: [], boards: [], nextId: 1 });
+export const createDoc = (name = DEFAULT_NAME): Doc => ({
+  name,
+  items: [],
+  boards: [],
+  scale: DEFAULT_SCALE,
+  nextId: 1,
+});
 
 export const sortedForDrawing = (items: readonly Item[]): Item[] =>
   [...items].sort((a, b) => DRAW_ORDER.indexOf(a.type) - DRAW_ORDER.indexOf(b.type));
@@ -17,6 +25,8 @@ const isStr = (v: unknown): v is string => typeof v === 'string';
 const isPoints = (v: unknown): v is Point[] =>
   Array.isArray(v) && v.every((p) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]));
 const toRotation = (v: unknown): Rotation => (v === 90 || v === 180 || v === 270 ? v : 0);
+const toKind = (v: unknown): RoomKind => (isStr(v) && v in ROOM_KINDS ? (v as RoomKind) : 'autre');
+const str = (v: unknown, max = 40): string => (isStr(v) ? v.slice(0, max) : '');
 
 /** Valide et normalise un élément brut ; retourne null s'il est inutilisable. */
 function parseItem(raw: unknown): Item | null {
@@ -26,7 +36,16 @@ function parseItem(raw: unknown): Item | null {
   switch (r.type) {
     case 'room':
       if (!isNum(r.x) || !isNum(r.y) || !isNum(r.w) || !isNum(r.h)) return null;
-      return { id: r.id, type: 'room', x: r.x, y: r.y, w: r.w, h: r.h, label: isStr(r.label) ? r.label : '' };
+      return {
+        id: r.id,
+        type: 'room',
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+        label: isStr(r.label) ? r.label : '',
+        kind: toKind(r.kind),
+      };
     case 'wall':
       return isPoints(r.points) ? { id: r.id, type: 'wall', points: r.points } : null;
     case 'wire':
@@ -36,10 +55,21 @@ function parseItem(raw: unknown): Item | null {
         type: 'wire',
         points: r.points,
         wtype: isStr(r.wtype) && r.wtype in WIRE_TYPES ? (r.wtype as keyof typeof WIRE_TYPES) : 'prises',
+        circuit: str(r.circuit),
       };
     case 'symbol':
       if (!isStr(r.kind) || !isNum(r.x) || !isNum(r.y)) return null;
-      return { id: r.id, type: 'symbol', kind: r.kind, x: r.x, y: r.y, rot: toRotation(r.rot), label: isStr(r.label) ? r.label : '' };
+      return {
+        id: r.id,
+        type: 'symbol',
+        kind: r.kind,
+        x: r.x,
+        y: r.y,
+        rot: toRotation(r.rot),
+        label: isStr(r.label) ? r.label : '',
+        circuit: str(r.circuit),
+        height: isNum(r.height) && r.height >= 0 && r.height <= 400 ? Math.round(r.height) : null,
+      };
     case 'text':
       if (!isStr(r.text) || !isNum(r.x) || !isNum(r.y)) return null;
       return { id: r.id, type: 'text', x: r.x, y: r.y, text: r.text };
@@ -63,6 +93,7 @@ export function parseDoc(raw: unknown): Doc {
     name: isStr(r.name) && r.name.trim() ? r.name : DEFAULT_NAME,
     items,
     boards,
+    scale: isNum(r.scale) && r.scale >= MIN_SCALE && r.scale <= MAX_SCALE ? r.scale : DEFAULT_SCALE,
     nextId: Math.max(maxId + 1, isNum(r.nextId) ? r.nextId : isNum(r.nid) ? r.nid : 1),
   };
 }

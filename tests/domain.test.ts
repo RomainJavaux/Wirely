@@ -19,7 +19,7 @@ describe('géométrie', () => {
 
   it('calcule l’englobante de plusieurs éléments', () => {
     const items: Item[] = [
-      { id: 1, type: 'room', x: 0, y: 0, w: 100, h: 50, label: '' },
+      { id: 1, type: 'room', x: 0, y: 0, w: 100, h: 50, label: '', kind: 'autre' },
       { id: 2, type: 'wall', points: [[-10, 5], [20, 80]] },
     ];
     expect(unionBounds(items)).toEqual({ x0: -10, y0: 0, x1: 100, y1: 80 });
@@ -59,7 +59,7 @@ describe('parseDoc', () => {
 describe('export SVG', () => {
   it('contient le titre échappé et une légende', () => {
     const doc = createDoc('Maison <1>');
-    doc.items.push({ id: 1, type: 'symbol', kind: 'prise', x: 0, y: 0, rot: 0, label: '' });
+    doc.items.push({ id: 1, type: 'symbol', kind: 'prise', x: 0, y: 0, rot: 0, label: '', circuit: '', height: null });
     const svg = buildExportSvg(doc);
     expect(svg).toContain('Maison &lt;1&gt;');
     expect(svg).toContain('Légende');

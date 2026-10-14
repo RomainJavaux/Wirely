@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Wirely</title>
-  <script type="module" crossorigin src="./assets/index-DW0enrrH.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CBxfF18U.css">
+  <script type="module" crossorigin src="./assets/index-ObWWmHsg.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cj5GfbqX.css">
 </head>
 <body>
   <header>
@@ -30,7 +30,8 @@
         <button data-exp="png">Image PNG</button>
         <button data-exp="svg">Image SVG</button>
         <button data-exp="pdf">PDF / Imprimer</button>
-        <button data-exp="csv" class="board-only">Circuits (CSV)</button>
+        <button data-exp="csv" id="csvBtn">Circuits (CSV)</button>
+        <button data-exp="csv2" class="plan-only">Nomenclature (CSV)</button>
       </div>
     </div>
     <input id="fileIn" type="file" accept=".json,application/json" hidden>
@@ -44,6 +45,10 @@
       <h3>Type de câble</h3>
       <div class="wires" id="wireTypes"></div>
       <div id="palette"></div>
+      <h3>Affichage</h3>
+      <div class="viewopts" id="viewOpts"></div>
+      <h3>Échelle</h3>
+      <div id="scaleBox"></div>
     </aside>
 
     <div id="stage">
@@ -56,11 +61,21 @@
         <rect width="100%" height="100%" fill="url(#gridL)"/>
         <g id="world"></g>
       </svg>
-      <div id="empty"><div><b>Commencez votre plan</b><br>
-        1. Dessinez une <b>pièce</b> ou des <b>murs</b><br>
-        2. Placez des <b>symboles</b> (prises, interrupteurs, lampes…)<br>
-        3. Reliez-les avec des <b>câbles</b><br>
-        4. <b>Exportez</b> en PNG, SVG ou PDF</div></div>
+      <div id="empty">
+        <div>
+          <h2>Dessinez le plan électrique de votre logement</h2>
+          <ol>
+            <li>Tracez des <b>pièces</b> et des <b>murs</b></li>
+            <li>Placez des <b>symboles</b> : prises, interrupteurs, lampes…</li>
+            <li>Reliez-les avec des <b>câbles</b> par circuit</li>
+            <li><b>Exportez</b> la fiche : plan, légende, surfaces, longueurs</li>
+          </ol>
+          <div class="row">
+            <button class="primary" id="exampleBtn">Partir d'un exemple (appartement)</button>
+          </div>
+        </div>
+      </div>
+      <div id="scaleBar" hidden><span class="bar"></span><b></b></div>
       <div id="hint"></div>
       <div id="zoomBox">
         <button id="zOut" title="Dézoomer">−</button>

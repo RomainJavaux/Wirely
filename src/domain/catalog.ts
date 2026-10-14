@@ -6,6 +6,13 @@ export interface SymbolDef {
   name: string;
   /** Contenu SVG dessiné autour de (0,0), dans une boîte d'environ ±16. */
   svg: string;
+  /**
+   * Ouverture (porte, fenêtre) : rectangle [x, y, largeur, hauteur] qui interrompt le mur sous le symbole.
+   * Le mur traverse l'origine : le symbole se pose directement sur la ligne du mur.
+   */
+  gap?: [number, number, number, number];
+  /** Cadre d'aperçu (palette, légende) quand le symbole sort de la boîte ±18 habituelle. */
+  viewBox?: string;
 }
 
 const txt = (t: string, size = 8): string =>
@@ -37,8 +44,17 @@ export const SYMBOLS: readonly SymbolDef[] = [
   { id: 'compteur', category: 'Distribution', name: 'Compteur', svg: '<rect x="-14" y="-9" width="28" height="18"/>' + txt('kWh', 6.5) },
   { id: 'deriv', category: 'Distribution', name: 'Boîte dériv.', svg: '<circle r="6"/><circle r="2" fill="#111"/>' },
 
-  { id: 'porte', category: 'Ouvertures', name: 'Porte', svg: '<path d="M-14 14V-14M-14 -14A28 28 0 0 1 14 14M-14 14H14"/>' },
-  { id: 'fenetre', category: 'Ouvertures', name: 'Fenêtre', svg: '<rect x="-16" y="-3" width="32" height="6" fill="#fff"/><path d="M-16 0H16"/>' },
+  {
+    // Le mur passe par l'origine : l'ouverture est sur y = 0, le vantail s'ouvre vers le haut.
+    id: 'porte', category: 'Ouvertures', name: 'Porte',
+    svg: '<path d="M-12 0V-24M-12 -24A24 24 0 0 1 12 0"/><path d="M-12 -3V3M12 -3V3"/>',
+    gap: [-12, -6, 24, 12], viewBox: '-18 -28 36 36',
+  },
+  {
+    id: 'fenetre', category: 'Ouvertures', name: 'Fenêtre',
+    svg: '<rect x="-16" y="-3" width="32" height="6" fill="#fff"/><path d="M-16 0H16"/>',
+    gap: [-17, -6, 34, 12],
+  },
 ];
 
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));

@@ -6,6 +6,20 @@ export type Rotation = 0 | 90 | 180 | 270;
 export type SymbolKind = string;
 export type WireTypeId = 'eclairage' | 'prises' | 'special' | 'reseau' | 'terre';
 
+export type RoomKind =
+  | 'sejour'
+  | 'cuisine'
+  | 'chambre'
+  | 'bureau'
+  | 'sdb'
+  | 'wc'
+  | 'entree'
+  | 'couloir'
+  | 'garage'
+  | 'cave'
+  | 'exterieur'
+  | 'autre';
+
 export interface Room {
   id: number;
   type: 'room';
@@ -14,6 +28,7 @@ export interface Room {
   w: number;
   h: number;
   label: string;
+  kind: RoomKind;
 }
 
 export interface Wall {
@@ -27,6 +42,8 @@ export interface Wire {
   type: 'wire';
   points: Point[];
   wtype: WireTypeId;
+  /** Repère du circuit du tableau qui alimente ce câble (texte libre, ex. « 3 »). */
+  circuit: string;
 }
 
 export interface SymbolItem {
@@ -37,6 +54,10 @@ export interface SymbolItem {
   y: number;
   rot: Rotation;
   label: string;
+  /** Repère du circuit du tableau qui alimente cet appareil. */
+  circuit: string;
+  /** Hauteur de pose en cm (null : non précisée). */
+  height: number | null;
 }
 
 export interface TextItem {
@@ -60,6 +81,8 @@ export interface Doc {
   items: Item[];
   /** Tableaux électriques du projet. */
   boards: Board[];
+  /** Échelle du plan : mètres représentés par un carreau de la grille. */
+  scale: number;
   /** Compteur d'identifiants partagé par le plan et les tableaux. */
   nextId: number;
 }

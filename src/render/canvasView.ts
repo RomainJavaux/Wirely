@@ -60,8 +60,14 @@ export class CanvasView {
 
   render(): void {
     this.tools.sync();
-    const { doc, selection } = this.store.state;
-    const scene = renderScene(doc, { interactive: true, selectedId: selection });
+    const { doc, selection, view } = this.store.state;
+    const scene = renderScene(doc, {
+      interactive: true,
+      selectedId: selection,
+      scale: view.dims ? doc.scale : undefined,
+      hide: { wires: !view.wires, symbols: !view.symbols, texts: !view.texts },
+    });
+    this.svg.classList.toggle('no-grid', !view.grid);
     this.world.innerHTML = scene + this.tools.active.overlay();
 
     const { x, y, k } = this.viewport;

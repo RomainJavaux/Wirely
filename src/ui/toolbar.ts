@@ -2,7 +2,7 @@ import type { Cloud } from '../cloud/cloud';
 import type { Store } from '../core/store';
 import { createDoc, parseDoc } from '../domain/document';
 import { exportBoardCsv, exportBoardPdf, exportBoardPng, exportBoardSvg } from '../io/boardSheet';
-import { exportPdf, exportPng, exportSvg, readDocFile, saveJson } from '../io/files';
+import { exportPdf, exportPlanBomCsv, exportPlanRoomsCsv, exportPng, exportSvg, readDocFile, saveJson } from '../io/files';
 import { qs } from './dom';
 
 /** Barre du haut : nom du projet, historique, fichiers et export. */
@@ -47,6 +47,8 @@ export class Toolbar {
       } else if (kind === 'png') exportPng(doc);
       else if (kind === 'svg') exportSvg(doc);
       else if (kind === 'pdf') exportPdf(doc);
+      else if (kind === 'csv') exportPlanRoomsCsv(doc);
+      else if (kind === 'csv2') exportPlanBomCsv(doc);
     });
 
     store.subscribe(() => this.sync());
@@ -55,6 +57,8 @@ export class Toolbar {
 
   private sync(): void {
     this.menuEl.classList.toggle('board-mode', this.store.state.mode === 'board');
+    const csv = document.querySelector<HTMLElement>('#csvBtn');
+    if (csv) csv.textContent = this.store.state.mode === 'board' ? 'Circuits (CSV)' : 'Pièces (CSV)';
     this.undoEl.disabled = !this.store.canUndo;
     this.redoEl.disabled = !this.store.canRedo;
     if (document.activeElement !== this.nameEl) this.nameEl.value = this.store.state.doc.name;

@@ -1,4 +1,4 @@
-import { deleteSelection, duplicateSelection, rotateSelection, setTool } from '../core/actions';
+import { deleteSelection, duplicateSelection, moveSelection, rotateSelection, setTool } from '../core/actions';
 import type { Store } from '../core/store';
 import type { CanvasView } from '../render/canvasView';
 import { saveJson } from '../io/files';
@@ -65,6 +65,20 @@ export function installShortcuts(store: Store, tools: ToolManager, canvas: Canva
     }
     if (key === 'r') {
       rotateSelection(store);
+      return;
+    }
+    // Flèches : déplacent la sélection d'un pas de grille (Maj : d'un carreau).
+    const arrow: Record<string, [number, number]> = {
+      arrowleft: [-1, 0],
+      arrowright: [1, 0],
+      arrowup: [0, -1],
+      arrowdown: [0, 1],
+    };
+    const dir = arrow[key];
+    if (dir && store.state.selection !== null) {
+      e.preventDefault();
+      const step = e.shiftKey ? 20 : 10;
+      moveSelection(store, dir[0] * step, dir[1] * step);
       return;
     }
     const tool = toolByKey.get(key);

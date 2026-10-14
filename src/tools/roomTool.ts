@@ -26,7 +26,7 @@ export class RoomTool extends BaseTool {
     this.cancel();
     if (!rect || rect.w < MIN_SIZE || rect.h < MIN_SIZE) return;
     const { store } = this.ctx;
-    addItem(store, { type: 'room', ...rect, label: '' });
+    addItem(store, { type: 'room', ...rect, label: '', kind: 'autre' });
     setTool(store, 'select');
     this.ctx.focusLabel();
   }
