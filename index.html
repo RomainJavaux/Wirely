@@ -98,7 +98,10 @@
             <option value="mono">Monophasé 230 V</option>
             <option value="tri">Triphasé 400 V</option>
           </select>
-          <select id="bCols" aria-label="Largeur du tableau"></select>
+          <span class="cols" title="Nombre de modules (17,5 mm) sur chaque rail">
+            <select id="bColsPreset" aria-label="Largeur du tableau"></select>
+            <input id="bCols" type="number" inputmode="numeric" step="1" aria-label="Nombre de modules par rail" hidden>
+          </span>
           <span class="rails">Rails
             <button id="bRowMinus" title="Retirer un rail vide">−</button>
             <b id="bRows">3</b>

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Wirely</title>
-  <script type="module" crossorigin src="./assets/index-0Qg_lSZG.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DuQLykor.css">
+  <script type="module" crossorigin src="./assets/index-DW0enrrH.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CBxfF18U.css">
 </head>
 <body>
   <header>
@@ -100,7 +100,10 @@
             <option value="mono">Monophasé 230 V</option>
             <option value="tri">Triphasé 400 V</option>
           </select>
-          <select id="bCols" aria-label="Largeur du tableau"></select>
+          <span class="cols" title="Nombre de modules (17,5 mm) sur chaque rail">
+            <select id="bColsPreset" aria-label="Largeur du tableau"></select>
+            <input id="bCols" type="number" inputmode="numeric" step="1" aria-label="Nombre de modules par rail" hidden>
+          </span>
           <span class="rails">Rails
             <button id="bRowMinus" title="Retirer un rail vide">−</button>
             <b id="bRows">3</b>
@@ -123,6 +126,6 @@
 
     <aside class="right" id="boardSide"></aside>
   </main>
-
+
 </body>
 </html>

@@ -1,4 +1,5 @@
 import { getDeviceDef } from './catalog';
+import { MAX_COLS, MIN_COLS } from './layout';
 import type { Board, Curve, Device, DiffType, Supply, UsageId } from './types';
 import { USAGES } from './catalog';
 
@@ -48,7 +49,7 @@ function parseBoard(raw: unknown): Board | null {
     name: isStr(r.name) && r.name.trim() ? r.name : 'Tableau',
     location: isStr(r.location) ? r.location : '',
     supply: (r.supply === 'tri' ? 'tri' : 'mono') satisfies Supply,
-    cols: isNum(r.cols) ? clamp(r.cols, 6, 36) : 13,
+    cols: isNum(r.cols) ? clamp(r.cols, MIN_COLS, MAX_COLS) : 13,
     rows: isNum(r.rows) ? clamp(r.rows, 1, 8) : 3,
     devices,
   };

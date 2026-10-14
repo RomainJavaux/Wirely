@@ -12,7 +12,7 @@ import {
 } from '../../core/boardActions';
 import type { Store } from '../../core/store';
 import { getDeviceDef } from '../../domain/board/catalog';
-import { canPlace, createDevice, deviceWidth, lastUsedRow, minCols } from '../../domain/board/layout';
+import { MAX_COLS, MIN_COLS, canPlace, createDevice, deviceWidth, lastUsedRow, minCols } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
 import { boardWidth, renderBoard, slotFromPoint, type Ghost } from '../../render/board/boardSvg';
 import { renderUnifilaire } from '../../render/board/unifilaire';
@@ -21,11 +21,14 @@ import { isTyping, qs } from '../dom';
 import { DevicePalette } from './devicePalette';
 import { BoardSidePanel } from './sidePanel';
 
+/** Largeurs de tableau courantes, proposées dans la liste. */
+const COL_PRESETS = [13, 18, 24, 36];
+const CUSTOM = 'custom';
+
 type Gesture =
   | { kind: 'palette'; deviceKind: string; startX: number; startY: number; dragging: boolean; wasArmed: boolean }
   | { kind: 'move'; id: number; startX: number; startY: number; dragging: boolean };
 
-const COL_CHOICES = [13, 18, 24, 36];
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 1.8;
 
@@ -46,7 +49,10 @@ export class BoardWorkspace {
   private readonly nameEl = qs<HTMLInputElement>('#bName');
   private readonly locEl = qs<HTMLInputElement>('#bLoc');
   private readonly supplyEl = qs<HTMLSelectElement>('#bSupply');
-  private readonly colsEl = qs<HTMLSelectElement>('#bCols');
+  private readonly presetEl = qs<HTMLSelectElement>('#bColsPreset');
+  private readonly colsEl = qs<HTMLInputElement>('#bCols');
+  /** Vrai quand l'utilisateur a choisi « Personnalisé… » : le champ libre est affiché. */
+  private customCols = false;
 
   constructor(private readonly store: Store) {
     new DevicePalette(qs('#boardPalette'), store, (kind, e) => this.onPalettePointerDown(kind, e));
@@ -84,9 +90,27 @@ export class BoardWorkspace {
       patchBoard(store, { supply: this.supplyEl.value === 'tri' ? 'tri' : 'mono' });
       store.commit();
     };
+    this.presetEl.onchange = () => {
+      if (this.presetEl.value === CUSTOM) {
+        this.customCols = true;
+        this.render();
+        this.colsEl.focus();
+        this.colsEl.select();
+        return;
+      }
+      this.customCols = false;
+      setCols(store, Number(this.presetEl.value));
+      this.needFit = true;
+    };
+    // Valeur personnalisée : appliquée à la validation (Entrée / perte du focus), pas à chaque frappe.
     this.colsEl.onchange = () => {
       setCols(store, Number(this.colsEl.value));
       this.needFit = true;
+      const board = store.activeBoard;
+      if (!board) return;
+      this.colsEl.value = String(board.cols); // reflète la valeur réellement retenue
+      if (COL_PRESETS.includes(board.cols)) this.customCols = false; // retombe sur un standard
+      this.render();
     };
     qs<HTMLButtonElement>('#bRowMinus').onclick = () => setRows(store, (store.activeBoard?.rows ?? 1) - 1);
     qs<HTMLButtonElement>('#bRowPlus').onclick = () => setRows(store, (store.activeBoard?.rows ?? 1) + 1);
@@ -293,6 +317,7 @@ export class BoardWorkspace {
     if (board.id !== this.lastBoardId) {
       this.lastBoardId = board.id;
       this.needFit = true;
+      this.customCols = false;
     }
 
     this.syncToolbar(board);
@@ -350,11 +375,24 @@ export class BoardWorkspace {
     if (document.activeElement !== this.locEl) this.locEl.value = board.location;
     this.supplyEl.value = board.supply;
 
-    const need = minCols(board);
-    const choices = [...new Set([...COL_CHOICES, board.cols])].sort((a, b) => a - b);
-    this.colsEl.innerHTML = choices
-      .map((c) => `<option value="${c}"${c === board.cols ? ' selected' : ''}${c < need ? ' disabled' : ''}>${c} modules</option>`)
-      .join('');
+    // Largeur : liste des standards (désactivés sous le minimum imposé par les appareils posés)
+    // et option « Personnalisé… » qui révèle un champ libre.
+    const need = Math.max(MIN_COLS, minCols(board));
+    const custom = this.customCols || !COL_PRESETS.includes(board.cols);
+    this.presetEl.innerHTML =
+      COL_PRESETS.map(
+        (c) =>
+          `<option value="${c}"${!custom && c === board.cols ? ' selected' : ''}${c < need ? ' disabled' : ''}>${c} modules</option>`,
+      ).join('') + `<option value="${CUSTOM}"${custom ? ' selected' : ''}>Personnalisé…</option>`;
+
+    this.colsEl.hidden = !custom;
+    this.colsEl.min = String(need);
+    this.colsEl.max = String(MAX_COLS);
+    this.colsEl.title =
+      need > MIN_COLS
+        ? `Minimum ${need} : les appareils posés occupent ${need} modules sur leur rail le plus rempli.`
+        : `Entre ${MIN_COLS} et ${MAX_COLS} modules.`;
+    if (document.activeElement !== this.colsEl) this.colsEl.value = String(board.cols);
 
     qs('#bRows').textContent = String(board.rows);
     qs<HTMLButtonElement>('#bRowMinus').disabled = board.rows <= Math.max(1, lastUsedRow(board) + 1);

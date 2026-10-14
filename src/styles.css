@@ -360,3 +360,7 @@ details.cat > summary .count {
 }
 details.cat[open] > .devgrid,
 details.cat[open] > .palette { padding-bottom: 12px; }
+
+/* ---------- Saisie du nombre de modules par rail ---------- */
+#boardBar .cols { display: inline-flex; align-items: center; gap: 6px; }
+#boardBar input#bCols { width: 74px; }

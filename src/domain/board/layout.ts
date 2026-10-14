@@ -1,6 +1,10 @@
 import { getDeviceDef, guessUsage, suggestSection, type DeviceDef, type Variant } from './catalog';
 import type { Board, Device, UsageId } from './types';
 
+/** Nombre de modules par rail : bornes de la saisie libre. */
+export const MIN_COLS = 4;
+export const MAX_COLS = 48;
+
 export const isCircuitRole = (def: DeviceDef): boolean => def.role === 'breaker' || def.role === 'rcbo';
 
 export function variantOf(device: Device): Variant {

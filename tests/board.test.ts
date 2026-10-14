@@ -8,6 +8,9 @@ import { buildBoard } from '../src/domain/board/templates';
 import type { Board } from '../src/domain/board/types';
 import { createDoc, parseDoc } from '../src/domain/document';
 import { buildBoardSheetSvg } from '../src/io/boardSheet';
+import { Store } from '../src/core/store';
+import { setCols } from '../src/core/boardActions';
+import { MAX_COLS, MIN_COLS } from '../src/domain/board/layout';
 
 let id = 100;
 const next = () => id++;
@@ -165,7 +168,7 @@ describe('persistance', () => {
       'oups',
     ]);
     expect(boards).toHaveLength(1);
-    expect(boards[0]).toMatchObject({ name: 'Tableau', cols: 36, rows: 1 });
+    expect(boards[0]).toMatchObject({ name: 'Tableau', cols: MAX_COLS, rows: 1 });
     expect(boards[0]?.devices).toHaveLength(1);
     expect(boards[0]?.devices[0]?.variant).toBe('1P+N');
   });
@@ -265,5 +268,69 @@ describe('calibres', () => {
     expect(ratings).toContain(16);
     expect(ratings).toContain(32);
     expect([...ratings]).toEqual([...ratings].sort((a, b) => a - b));
+  });
+});
+
+describe('nombre de modules par rail (saisie libre)', () => {
+  const storeWith = (devices: Board['devices'] = [], cols = 13) => {
+    const doc = createDoc();
+    const b = board(devices, { cols, rows: 2 });
+    doc.boards.push(b);
+    return new Store(doc);
+  };
+
+  it('accepte une valeur quelconque dans les bornes', () => {
+    const store = storeWith();
+    setCols(store, 20);
+    expect(store.activeBoard?.cols).toBe(20);
+    setCols(store, 15);
+    expect(store.activeBoard?.cols).toBe(15);
+  });
+
+  it('ne descend jamais sous ce qu’occupent les appareils posés', () => {
+    const store = storeWith([dev('nb_sw12', 0, 0)]); // 14 modules
+    setCols(store, 6);
+    expect(store.activeBoard?.cols).toBe(14);
+  });
+
+  it('respecte les bornes minimale et maximale', () => {
+    const store = storeWith();
+    setCols(store, 1);
+    expect(store.activeBoard?.cols).toBe(MIN_COLS);
+    setCols(store, 500);
+    expect(store.activeBoard?.cols).toBe(MAX_COLS);
+  });
+
+  it('ignore une saisie invalide et arrondit les décimales', () => {
+    const store = storeWith();
+    setCols(store, Number.NaN);
+    expect(store.activeBoard?.cols).toBe(13);
+    setCols(store, 17.6);
+    expect(store.activeBoard?.cols).toBe(18);
+  });
+
+  it('est annulable', () => {
+    const store = storeWith();
+    setCols(store, 24);
+    store.undo();
+    expect(store.activeBoard?.cols).toBe(13);
+  });
+
+  it('un fichier avec une largeur hors bornes est ramené dans les bornes', () => {
+    const [b] = parseBoards([{ id: 1, cols: 9999, devices: [] }, { id: 2, cols: 1, devices: [] }]);
+    expect(b?.cols).toBe(MAX_COLS);
+    expect(parseBoards([{ id: 2, cols: 1, devices: [] }])[0]?.cols).toBe(MIN_COLS);
+  });
+});
+
+describe('largeurs standard', () => {
+  it('les largeurs courantes sont acceptées telles quelles', () => {
+    for (const cols of [13, 18, 24, 36]) {
+      const doc = createDoc();
+      doc.boards.push(board([], { cols: 13, rows: 1 }));
+      const store = new Store(doc);
+      setCols(store, cols);
+      expect(store.activeBoard?.cols).toBe(cols);
+    }
   });
 });

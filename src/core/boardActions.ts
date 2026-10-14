@@ -6,6 +6,8 @@ import {
   deviceWidth,
   firstFreeSlot,
   lastUsedRow,
+  MAX_COLS,
+  MIN_COLS,
   minCols,
 } from '../domain/board/layout';
 import { buildBoard, type BoardTemplate } from '../domain/board/templates';
@@ -111,10 +113,14 @@ export function setRows(store: Store, rows: number): void {
   store.commit();
 }
 
+/**
+ * Fixe le nombre de modules par rail. La valeur est ramenée dans les bornes : jamais en dessous
+ * de ce qu'occupent les appareils déjà posés, ni hors de [MIN_COLS, MAX_COLS].
+ */
 export function setCols(store: Store, cols: number): void {
   const board = store.activeBoard;
-  if (!board) return;
-  const next = Math.max(minCols(board), cols);
+  if (!board || !Number.isFinite(cols)) return;
+  const next = Math.min(MAX_COLS, Math.max(MIN_COLS, minCols(board), Math.round(cols)));
   if (next === board.cols) return;
   edit(store, (b) => ({ ...b, cols: next }));
   store.commit();
