@@ -11,20 +11,33 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-// Avant de charger Laravel : une version de PHP trop ancienne produirait une page d'erreur muette.
-if (PHP_VERSION_ID < 80300) {
-    http_response_code(503);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['message' => 'PHP '.PHP_VERSION.' sur ce site : PHP 8.3 ou plus est requis. Changez la version dans hPanel (Avancé > Configuration PHP).']);
-    exit;
-}
-
 $backend = dirname(__DIR__).'/backend';
 
 if (! is_file($backend.'/vendor/autoload.php')) {
     http_response_code(503);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['message' => 'API non installée : exécutez « composer install » dans backend/ (voir README).']);
+    exit;
+}
+
+// Version de PHP exigée par les dépendances installées, telle que Composer l'a calculée.
+// Vérifiée ici, avant Laravel : sinon Composer interrompt la requête par un texte brut peu parlant.
+$required = 80300;
+$platformCheck = $backend.'/vendor/composer/platform_check.php';
+if (is_file($platformCheck) && preg_match('/PHP_VERSION_ID >= (\d+)/', (string) file_get_contents($platformCheck), $m)) {
+    $required = (int) $m[1];
+}
+
+if (PHP_VERSION_ID < $required) {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['message' => sprintf(
+        'Le site tourne en PHP %s : PHP %d.%d.%d ou plus est requis. Changez la version dans hPanel (Avancé > Configuration PHP).',
+        PHP_VERSION,
+        intdiv($required, 10000),
+        intdiv($required % 10000, 100),
+        $required % 100,
+    )]);
     exit;
 }
 

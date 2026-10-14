@@ -24,7 +24,8 @@ class StatusController extends Controller
     {
         $checks = [
             'php' => PHP_VERSION,
-            'php_ok' => version_compare(PHP_VERSION, '8.3.0', '>='),
+            'php_required' => $this->requiredPhp(),
+            'php_ok' => PHP_VERSION_ID >= $this->requiredPhpId(),
             'app_key' => filled(config('app.key')),
             'storage_writable' => is_writable(storage_path('logs')) && is_writable(storage_path('framework')),
             'cache_ok' => $this->cacheWorks(),
@@ -44,6 +45,25 @@ class StatusController extends Controller
         $ok = $hints === [];
 
         return response()->json(['ok' => $ok, 'checks' => $checks, 'hints' => $hints], $ok ? 200 : 503);
+    }
+
+    /** Identifiant (80401 pour 8.4.1) exigé par les dépendances, lu dans le contrôle de Composer. */
+    private function requiredPhpId(): int
+    {
+        $file = base_path('vendor/composer/platform_check.php');
+
+        if (is_file($file) && preg_match('/PHP_VERSION_ID >= (\d+)/', (string) file_get_contents($file), $m)) {
+            return (int) $m[1];
+        }
+
+        return 80300;
+    }
+
+    private function requiredPhp(): string
+    {
+        $id = $this->requiredPhpId();
+
+        return sprintf('%d.%d.%d', intdiv($id, 10000), intdiv($id % 10000, 100), $id % 100);
     }
 
     private function cacheWorks(): bool
@@ -66,7 +86,7 @@ class StatusController extends Controller
         $hints = [];
 
         if (! $c['php_ok']) {
-            $hints[] = "Le site tourne en PHP {$c['php']} : PHP 8.3 ou plus est requis. Changez la version dans hPanel (Avancé > Configuration PHP).";
+            $hints[] = "Le site tourne en PHP {$c['php']} : PHP {$c['php_required']} ou plus est requis. Changez la version dans hPanel (Avancé > Configuration PHP).";
         }
         if (! $c['app_key']) {
             $hints[] = "Clé d'application absente : lancez « php artisan key:generate --force » dans backend/.";

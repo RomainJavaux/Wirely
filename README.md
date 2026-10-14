@@ -105,7 +105,7 @@ git push
 
 1. **Créer la base MySQL** dans hPanel (Bases de données → Gestion MySQL) : notez le nom de la
    base, l'utilisateur et le mot de passe (Hostinger les préfixe, par exemple `u123456789_wirely`).
-2. **En SSH** (PHP 8.3 ou plus, à régler dans hPanel), dans le dossier du site :
+2. **En SSH** (PHP 8.4.1 ou plus, à régler dans hPanel **pour le site** et pas seulement pour le terminal), dans le dossier du site :
 
 ```bash
 cd backend
