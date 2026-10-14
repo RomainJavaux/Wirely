@@ -1,7 +1,8 @@
 import { translateItem } from '../domain/geometry';
 import { MAX_SCALE, MIN_SCALE } from '../domain/plan/metrics';
+import { detachPart, mergeRooms } from '../domain/plan/rooms';
 import { examplePlan } from '../domain/plan/templates';
-import type { NewItem, Item, Rotation } from '../domain/types';
+import type { NewItem, Item, Rotation, Room } from '../domain/types';
 import type { Store } from './store';
 
 /** Ajoute un élément, le sélectionne et valide. Retourne son identifiant. */
@@ -70,4 +71,52 @@ export function loadExamplePlan(store: Store): boolean {
   store.state.selection = null;
   store.commit();
   return true;
+}
+
+/** Démarre la fusion : la pièce sélectionnée absorbera la prochaine pièce cliquée. */
+export function startMerge(store: Store): void {
+  const item = store.selectedItem;
+  if (item?.type === 'room') store.change((s) => (s.mergeFrom = item.id));
+}
+
+export function cancelMerge(store: Store): void {
+  if (store.state.mergeFrom !== null) store.change((s) => (s.mergeFrom = null));
+}
+
+/**
+ * Fusionne `fromId` dans `intoId` : les rectangles de la seconde deviennent des parties de la
+ * première, qui garde son nom et son type. Les symboles ne bougent pas. Retourne false si impossible.
+ */
+export function mergeRoomsInto(store: Store, intoId: number, fromId: number): boolean {
+  const into = store.getItem(intoId);
+  const from = store.getItem(fromId);
+  if (into?.type !== 'room' || from?.type !== 'room' || intoId === fromId) return false;
+  const merged = mergeRooms(into, from);
+  const doc = store.state.doc;
+  doc.items = doc.items.filter((i) => i.id !== fromId).map((i) => (i.id === intoId ? merged : i));
+  store.state.selection = intoId;
+  store.state.mergeFrom = null;
+  store.commit();
+  return true;
+}
+
+/** Détache une partie d'une pièce composée : elle redevient une pièce à part entière. */
+export function detachRoomPart(store: Store, roomId: number, index: number): void {
+  const room = store.getItem(roomId);
+  if (room?.type !== 'room') return;
+  const result = detachPart(room, index);
+  if (!result) return;
+  const doc = store.state.doc;
+  const detached: Room = {
+    id: doc.nextId++,
+    type: 'room',
+    ...result.part,
+    label: '',
+    kind: room.kind,
+    parts: [],
+  };
+  doc.items = doc.items.map((i) => (i.id === roomId ? result.room : i));
+  doc.items.push(detached);
+  store.state.selection = detached.id;
+  store.commit();
 }

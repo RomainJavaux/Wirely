@@ -1,6 +1,8 @@
 import { ACCENT } from '../render/items';
 import { snap, translateItem } from '../domain/geometry';
 import type { Item, Point } from '../domain/types';
+import { mergeRoomsInto } from '../core/actions';
+import { roomRects } from '../domain/plan/rooms';
 import { BaseTool, type PointerInfo } from './tool';
 
 type Gesture =
@@ -14,6 +16,16 @@ export class SelectTool extends BaseTool {
 
   override pointerDown(p: PointerInfo): void {
     const { store } = this.ctx;
+
+    // Mode fusion : le clic suivant désigne la pièce à absorber.
+    const from = store.state.mergeFrom;
+    if (from !== null) {
+      const target = p.targetId !== null ? store.getItem(p.targetId) : undefined;
+      if (target?.type === 'room' && target.id !== from) mergeRoomsInto(store, from, target.id);
+      else store.change((s) => (s.mergeFrom = null));
+      return;
+    }
+
     const current = store.selectedItem;
 
     if (p.handle !== null && current) {
@@ -46,6 +58,15 @@ export class SelectTool extends BaseTool {
     const o = g.origin;
     if (g.handle === 'br' && o.type === 'room') {
       store.updateItem({ ...o, w: Math.max(20, p.snapped[0] - o.x), h: Math.max(20, p.snapped[1] - o.y) });
+    } else if (g.handle.startsWith('p') && o.type === 'room') {
+      // Poignée d'une partie d'une pièce composée : « p0 » est la première partie ajoutée.
+      const i = Number(g.handle.slice(1));
+      store.updateItem({
+        ...o,
+        parts: o.parts.map((q, k) =>
+          k === i ? { ...q, w: Math.max(20, p.snapped[0] - q.x), h: Math.max(20, p.snapped[1] - q.y) } : q,
+        ),
+      });
     } else if (o.type === 'wall' || o.type === 'wire') {
       const target = o.type === 'wire' ? p.magnet : p.snapped;
       const points = o.points.map((pt, i): Point => (i === Number(g.handle) ? target : pt));
@@ -76,7 +97,12 @@ export class SelectTool extends BaseTool {
         .join('');
     }
     if (item.type === 'room') {
-      return `<rect data-h="br" x="${item.x + item.w - r}" y="${item.y + item.h - r}" width="${2 * r}" height="${2 * r}" ${common} style="cursor:nwse-resize"/>`;
+      return roomRects(item)
+        .map((q, i) => {
+          const handle = i === 0 ? 'br' : `p${i - 1}`;
+          return `<rect data-h="${handle}" x="${q.x + q.w - r}" y="${q.y + q.h - r}" width="${2 * r}" height="${2 * r}" ${common} style="cursor:nwse-resize"/>`;
+        })
+        .join('');
     }
     return '';
   }

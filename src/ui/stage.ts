@@ -47,8 +47,12 @@ export class Stage {
   }
 
   private sync(): void {
-    const { tool, doc } = this.store.state;
-    this.hintEl.textContent = toolMeta(tool).hint;
+    const { tool, doc, mergeFrom } = this.store.state;
+    const source = mergeFrom !== null ? doc.items.find((i) => i.id === mergeFrom) : undefined;
+    this.hintEl.textContent =
+      source?.type === 'room'
+        ? `Fusion : cliquez la pièce à intégrer dans « ${source.label.trim() || 'cette pièce'} » (Échap pour annuler).`
+        : toolMeta(tool).hint;
     this.emptyEl.style.display = doc.items.length ? 'none' : 'flex';
     this.syncScaleBar();
   }

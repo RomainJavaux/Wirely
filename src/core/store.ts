@@ -33,6 +33,8 @@ export interface AppState {
   deviceSelection: number | null;
   /** Appareil choisi dans la palette, prêt à être posé sur un rail. */
   armedKind: DeviceKind | null;
+  /** Fusion de pièces en cours : pièce qui absorbera la prochaine pièce cliquée. */
+  mergeFrom: number | null;
 }
 
 type Listener = () => void;
@@ -67,6 +69,7 @@ export class Store {
       boardId: doc.boards[0]?.id ?? null,
       deviceSelection: null,
       armedKind: null,
+      mergeFrom: null,
     };
     this.history = [JSON.stringify(doc)];
   }
@@ -164,6 +167,7 @@ export class Store {
     this.state.doc = doc;
     this.state.selection = null;
     this.state.deviceSelection = null;
+    this.state.mergeFrom = null;
     this.state.boardId = doc.boards[0]?.id ?? null;
     this.history = [JSON.stringify(doc)];
     this.cursor = 0;
@@ -183,6 +187,7 @@ export class Store {
     this.cursor = index;
     this.state.doc = JSON.parse(this.history[index] as string) as Doc;
     if (this.getItem(this.state.selection) === undefined) this.state.selection = null;
+    if (this.getItem(this.state.mergeFrom) === undefined) this.state.mergeFrom = null;
     this.fixBoardSelection();
     this.revision++;
     this.notify();

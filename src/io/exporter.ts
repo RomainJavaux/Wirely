@@ -94,7 +94,7 @@ function roomsSection(doc: Doc): SheetSection | null {
     [
       { title: 'Pièce', frac: 0.2, get: (r) => r.name },
       { title: 'Type', frac: 0.15, get: (r) => r.type },
-      { title: 'Dimensions', frac: 0.17, get: (r) => `${r.width} × ${r.depth} m` },
+      { title: 'Dimensions', frac: 0.17, get: (r) => `${r.width} × ${r.depth} m${r.merged ? ' (hors tout)' : ''}` },
       { title: 'Surface', frac: 0.1, get: (r) => `${r.area} m²` },
       { title: 'Prises', frac: 0.09, get: (r) => String(r.sockets) },
       { title: 'Points lumineux', frac: 0.12, get: (r) => String(r.lights) },

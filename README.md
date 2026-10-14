@@ -10,6 +10,8 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
   Surfaces, cotes et longueurs de câble sont calculées ; un panneau de synthèse et des contrôles
   indicatifs par pièce (prises, point lumineux, détecteur de fumée) aident à la conception.
   Chaque symbole peut porter un circuit du tableau et une hauteur de pose.
+  Une pièce en L ou en U est **une seule pièce** : on fusionne des rectangles (une seule surface,
+  un seul nom, un contour unifié), et on peut détacher une partie ensuite.
   Export : fiche avec plan coté et barre d'échelle, légende chiffrée, tableau des pièces et
   nomenclature (PNG / SVG / PDF), plus CSV des pièces et de la nomenclature.
 - **Tableau** : rails DIN sur lesquels on pose des appareils modulaires (disjoncteurs,

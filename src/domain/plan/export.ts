@@ -16,6 +16,8 @@ export interface RoomRow {
   lights: number;
   switches: number;
   equipment: number;
+  /** Pièce composée de plusieurs rectangles : les dimensions sont hors tout. */
+  merged: boolean;
 }
 
 /** Une ligne par pièce : dimensions, surface et équipements, du haut vers le bas du plan. */
@@ -32,6 +34,7 @@ export function roomRows(doc: Pick<Doc, 'items' | 'scale'>): RoomRow[] {
       lights: s.lights,
       switches: s.switches,
       equipment: s.symbols.length,
+      merged: s.merged,
     };
   });
 }

@@ -1,6 +1,7 @@
 import { getSymbol } from '../catalog';
 import { GRID } from '../geometry';
 import type { Doc, Item, Point, Room, SymbolItem, Wire, WireTypeId } from '../types';
+import { roomArea, roomBox, roomContains } from './rooms';
 
 /** Échelle par défaut : un carreau de la grille représente 0,5 m. */
 export const DEFAULT_SCALE = 0.5;
@@ -9,6 +10,8 @@ export const MAX_SCALE = 5;
 
 /** Convertit une longueur du plan (unités) en mètres. */
 export const toMeters = (scale: number, units: number): number => (units / GRID) * scale;
+/** Convertit une surface en unités du plan au carré en m². */
+export const toSquareMeters = (scale: number, units2: number): number => (units2 / (GRID * GRID)) * scale * scale;
 /** Convertit des mètres en unités du plan. */
 export const toUnits = (scale: number, meters: number): number => (meters / scale) * GRID;
 
@@ -34,8 +37,10 @@ export interface RoomStats {
   /** Largeur et profondeur en mètres. */
   width: number;
   depth: number;
-  /** Surface en m². */
+  /** Surface en m² (union des parties : un recouvrement ne compte qu'une fois). */
   area: number;
+  /** Pièce composée de plusieurs rectangles : width/depth sont alors hors tout. */
+  merged: boolean;
   symbols: SymbolItem[];
   /** Prises 16 A (hors prises spécialisées, RJ45 et TV). */
   sockets: number;
@@ -47,14 +52,17 @@ const SOCKET_KINDS = new Set(['prise']);
 const LIGHT_KINDS = new Set(['lampe', 'applique', 'spot']);
 const SWITCH_KINDS = new Set(['inter', 'va', 'poussoir']);
 
-const contains = (r: Room, x: number, y: number): boolean =>
-  x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
-
-/** Pièce qui contient le point ; la plus petite si plusieurs se recouvrent. */
+/** Pièce qui contient le point ; la plus petite (en surface) si plusieurs se recouvrent. */
 export function roomAt(rooms: readonly Room[], x: number, y: number): Room | null {
   let best: Room | null = null;
+  let bestArea = Infinity;
   for (const r of rooms) {
-    if (contains(r, x, y) && (!best || r.w * r.h < best.w * best.h)) best = r;
+    if (!roomContains(r, x, y)) continue;
+    const area = roomArea(r);
+    if (area < bestArea) {
+      best = r;
+      bestArea = area;
+    }
   }
   return best;
 }
@@ -67,9 +75,12 @@ export function roomStats(doc: Pick<Doc, 'items' | 'scale'>): RoomStats[] {
   const rooms = roomsOf(doc.items);
   const stats = new Map<number, RoomStats>(
     rooms.map((room) => {
-      const width = toMeters(doc.scale, room.w);
-      const depth = toMeters(doc.scale, room.h);
-      return [room.id, { room, width, depth, area: width * depth, symbols: [], sockets: 0, lights: 0, switches: 0 }];
+      const box = roomBox(room);
+      const width = toMeters(doc.scale, box.x1 - box.x0);
+      const depth = toMeters(doc.scale, box.y1 - box.y0);
+      const area = toSquareMeters(doc.scale, roomArea(room));
+      const merged = room.parts.length > 0;
+      return [room.id, { room, width, depth, area, merged, symbols: [], sockets: 0, lights: 0, switches: 0 }];
     }),
   );
   for (const it of doc.items) {
@@ -112,7 +123,7 @@ export function planSummary(doc: Pick<Doc, 'items' | 'scale'>): PlanSummary {
     switch (it.type) {
       case 'room':
         rooms++;
-        area += toMeters(doc.scale, it.w) * toMeters(doc.scale, it.h);
+        area += toSquareMeters(doc.scale, roomArea(it));
         break;
       case 'wall':
         wallLength += toMeters(doc.scale, polylineLength(it.points));

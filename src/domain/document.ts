@@ -2,7 +2,7 @@ import { parseBoards } from './board/parse';
 import { WIRE_TYPES } from './catalog';
 import { DEFAULT_SCALE, MAX_SCALE, MIN_SCALE } from './plan/metrics';
 import { ROOM_KINDS } from './plan/roomKinds';
-import type { Doc, Item, ItemType, Point, Rotation, RoomKind } from './types';
+import type { Doc, Item, ItemType, Point, Rotation, RoomKind, RoomRect } from './types';
 
 export const DEFAULT_NAME = 'Mon installation';
 
@@ -27,6 +27,16 @@ const isPoints = (v: unknown): v is Point[] =>
 const toRotation = (v: unknown): Rotation => (v === 90 || v === 180 || v === 270 ? v : 0);
 const toKind = (v: unknown): RoomKind => (isStr(v) && v in ROOM_KINDS ? (v as RoomKind) : 'autre');
 const str = (v: unknown, max = 40): string => (isStr(v) ? v.slice(0, max) : '');
+const MAX_PARTS = 16;
+
+function parseParts(v: unknown): RoomRect[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((q): q is Record<string, unknown> => typeof q === 'object' && q !== null)
+    .filter((q) => isNum(q.x) && isNum(q.y) && isNum(q.w) && isNum(q.h) && (q.w as number) > 0 && (q.h as number) > 0)
+    .slice(0, MAX_PARTS)
+    .map((q) => ({ x: q.x as number, y: q.y as number, w: q.w as number, h: q.h as number }));
+}
 
 /** Valide et normalise un élément brut ; retourne null s'il est inutilisable. */
 function parseItem(raw: unknown): Item | null {
@@ -45,6 +55,7 @@ function parseItem(raw: unknown): Item | null {
         h: r.h,
         label: isStr(r.label) ? r.label : '',
         kind: toKind(r.kind),
+        parts: parseParts(r.parts),
       };
     case 'wall':
       return isPoints(r.points) ? { id: r.id, type: 'wall', points: r.points } : null;

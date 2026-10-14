@@ -20,6 +20,14 @@ export type RoomKind =
   | 'exterieur'
   | 'autre';
 
+/** Rectangle (unités du plan). */
+export interface RoomRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface Room {
   id: number;
   type: 'room';
@@ -29,6 +37,11 @@ export interface Room {
   h: number;
   label: string;
   kind: RoomKind;
+  /**
+   * Rectangles ajoutés au rectangle principal (x, y, w, h) : une pièce en L ou en U est une seule
+   * pièce, avec une seule surface. Vide pour une pièce rectangulaire.
+   */
+  parts: RoomRect[];
 }
 
 export interface Wall {

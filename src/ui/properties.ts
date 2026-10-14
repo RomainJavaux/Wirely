@@ -1,4 +1,4 @@
-import { deleteSelection, duplicateSelection, rotateSelection } from '../core/actions';
+import { deleteSelection, detachRoomPart, duplicateSelection, rotateSelection, startMerge } from '../core/actions';
 import type { Store } from '../core/store';
 import { WIRE_TYPES, WIRE_TYPE_IDS, SYMBOL_CATEGORIES, getSymbol } from '../domain/catalog';
 import { getDeviceDef } from '../domain/board/catalog';
@@ -180,6 +180,17 @@ export class PropertiesPanel {
       const kind = getRoomKind(item.kind);
       const w = toMeters(doc.scale, item.w);
       const d = toMeters(doc.scale, item.h);
+      const merged = item.parts.length > 0;
+      const others = roomsOf(doc.items).length > 1;
+      const partsHtml = merged
+        ? `<p class="muted">Pièce composée de <b>${item.parts.length + 1}</b> parties. Les dimensions ci-dessus sont celles du rectangle principal ; glissez la poignée de chaque partie pour l'ajuster.</p>
+           <ul class="parts">${item.parts
+             .map(
+               (q, i) =>
+                 `<li><span>Partie ${i + 2} · ${fmtMeters(toMeters(doc.scale, q.w))} × ${fmtMeters(toMeters(doc.scale, q.h))}</span><button type="button" data-detach="${i}">Détacher</button></li>`,
+             )
+             .join('')}</ul>`
+        : '';
       h += `<label class="f" for="pLabel">Nom</label>
         <input type="text" id="pLabel" value="${esc(item.label)}" placeholder="${esc(kind.name)}">
         <label class="f">Type de pièce</label>
@@ -191,7 +202,9 @@ export class PropertiesPanel {
           <div><label class="f" for="pW">Largeur (m)</label><input type="number" id="pW" min="0.5" step="0.1" value="${w.toFixed(2)}"></div>
           <div><label class="f" for="pD">Profondeur (m)</label><input type="number" id="pD" min="0.5" step="0.1" value="${d.toFixed(2)}"></div>
         </div>
-        <p class="muted">Surface : <b>${fmtArea(w * d)}</b></p>`;
+        <p class="muted">Surface${merged ? ' totale' : ''} : <b>${fmtArea(stats?.area ?? w * d)}</b></p>
+        ${partsHtml}
+        <div class="row"><button type="button" id="pMerge"${others ? '' : ' disabled'} title="Cliquez ensuite sur la pièce à fusionner dans celle-ci">Fusionner avec une autre pièce…</button></div>`;
       if (stats) {
         const min = kind.minSockets ? kind.minSockets(stats.area) : null;
         const short = min !== null && stats.sockets < min;
@@ -308,6 +321,10 @@ export class PropertiesPanel {
       const b = $<HTMLButtonElement>(sel);
       if (b) b.onclick = fn;
     };
+    on('#pMerge', () => startMerge(store));
+    this.el.querySelectorAll<HTMLButtonElement>('[data-detach]').forEach((b) => {
+      b.onclick = () => detachRoomPart(store, id, Number(b.dataset.detach));
+    });
     on('#pRot', () => rotateSelection(store));
     on('#pRotL', () => rotateSelection(store, -90));
     on('#pDup', () => duplicateSelection(store));

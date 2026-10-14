@@ -18,8 +18,15 @@ export const distance = (a: Point, b: Point): number => Math.hypot(a[0] - b[0], 
 
 export function itemBounds(item: Item): Rect {
   switch (item.type) {
-    case 'room':
-      return { x0: item.x, y0: item.y, x1: item.x + item.w, y1: item.y + item.h };
+    case 'room': {
+      const rects = [{ x: item.x, y: item.y, w: item.w, h: item.h }, ...item.parts];
+      return {
+        x0: Math.min(...rects.map((r) => r.x)),
+        y0: Math.min(...rects.map((r) => r.y)),
+        x1: Math.max(...rects.map((r) => r.x + r.w)),
+        y1: Math.max(...rects.map((r) => r.y + r.h)),
+      };
+    }
     case 'wall':
     case 'wire': {
       const xs = item.points.map((p) => p[0]);
@@ -50,6 +57,14 @@ export function translateItem<T extends Item>(item: T, dx: number, dy: number): 
   const it: Item = item;
   if (it.type === 'wall' || it.type === 'wire') {
     return { ...it, points: it.points.map(([x, y]): Point => [x + dx, y + dy]) } as T;
+  }
+  if (it.type === 'room') {
+    return {
+      ...it,
+      x: it.x + dx,
+      y: it.y + dy,
+      parts: it.parts.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })),
+    } as T;
   }
   return { ...it, x: it.x + dx, y: it.y + dy } as T;
 }

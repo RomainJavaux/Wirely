@@ -1,6 +1,7 @@
 import { getSymbol, getWireType } from '../domain/catalog';
 import { sortedForDrawing } from '../domain/document';
-import { fmtArea, fmtMeters, polylineLength, toMeters } from '../domain/plan/metrics';
+import { fmtArea, fmtMeters, polylineLength, toMeters, toSquareMeters } from '../domain/plan/metrics';
+import { largestRect, outlineSegments, roomArea, roomBox, roomRects } from '../domain/plan/rooms';
 import { getRoomKind } from '../domain/plan/roomKinds';
 import type { Doc, Item, Point, Room, SymbolItem, Wall, Wire } from '../domain/types';
 import { esc } from '../util/escape';
@@ -58,20 +59,41 @@ function pill(x: number, y: number, text: string, opts: { size?: number; fill?: 
 function renderRoom(it: Room, o: RenderOptions, selected: boolean): string {
   const kind = getRoomKind(it.kind);
   const attr = o.interactive ? ` data-id="${it.id}"` : '';
-  let out =
-    `<g${attr}><rect x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" fill="${kind.color}" ` +
-    `stroke="${selected ? ACCENT : '#aab3c2'}" stroke-width="${selected ? 2.5 : 1}"/>`;
+  const rects = roomRects(it);
+  const stroke = selected ? ACCENT : '#aab3c2';
+  const sw = selected ? 2.5 : 1;
+  let out = `<g${attr}>`;
 
-  const name = it.label.trim() || (it.kind === 'autre' ? '' : kind.name);
-  const cx = it.x + it.w / 2;
-  if (name) {
-    out += `<text x="${cx}" y="${it.y + 20}" font-size="13" font-weight="700" text-anchor="middle" font-family="${FONT}" fill="#374151">${esc(name)}</text>`;
+  if (rects.length === 1) {
+    out += `<rect x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" fill="${kind.color}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  } else {
+    // Pièce composée : les parties sont remplies sans bordure, puis le contour de l'union est tracé :
+    // les arêtes communes entre deux parties disparaissent.
+    for (const r of rects) out += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${kind.color}"/>`;
+    const d = outlineSegments(rects)
+      .map(([x1, y1, x2, y2]) => `M${x1} ${y1}L${x2} ${y2}`)
+      .join('');
+    out += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="square"/>`;
   }
-  if (o.scale !== undefined && it.w >= 80 && it.h >= 60) {
-    const w = toMeters(o.scale, it.w);
-    const d = toMeters(o.scale, it.h);
-    const text = `${w.toFixed(1).replace('.', ',')} × ${d.toFixed(1).replace('.', ',')} m · ${fmtArea(w * d)}`;
-    out += `<text x="${cx}" y="${it.y + (name ? 35 : 20)}" font-size="10" text-anchor="middle" font-family="${FONT}" fill="#6b7385">${esc(text)}</text>`;
+
+  // Nom et surface : dans le plus grand rectangle de la pièce.
+  const main = largestRect(rects);
+  const name = it.label.trim() || (it.kind === 'autre' ? '' : kind.name);
+  const cx = main.x + main.w / 2;
+  if (name) {
+    out += `<text x="${cx}" y="${main.y + 20}" font-size="13" font-weight="700" text-anchor="middle" font-family="${FONT}" fill="#374151">${esc(name)}</text>`;
+  }
+  if (o.scale !== undefined && main.w >= 80 && main.h >= 60) {
+    let text: string;
+    if (rects.length === 1) {
+      const w = toMeters(o.scale, it.w);
+      const d = toMeters(o.scale, it.h);
+      text = `${w.toFixed(1).replace('.', ',')} × ${d.toFixed(1).replace('.', ',')} m · ${fmtArea(w * d)}`;
+    } else {
+      const m2 = toSquareMeters(o.scale, roomArea(it));
+      text = `${fmtArea(m2)} · ${rects.length} parties`;
+    }
+    out += `<text x="${cx}" y="${main.y + (name ? 35 : 20)}" font-size="10" text-anchor="middle" font-family="${FONT}" fill="#6b7385">${esc(text)}</text>`;
   }
   return out + '</g>';
 }
@@ -79,20 +101,23 @@ function renderRoom(it: Room, o: RenderOptions, selected: boolean): string {
 /** Cotes d'une pièce sélectionnée : deux lignes de cote avec leurs longueurs, hors de la pièce. */
 function renderRoomDims(it: Room, scale: number): string {
   const col = ACCENT;
-  const w = fmtMeters(toMeters(scale, it.w));
-  const h = fmtMeters(toMeters(scale, it.h));
-  const yTop = it.y - 16;
-  const xLeft = it.x - 16;
+  const box = roomBox(it); // hors tout, pour une pièce composée
+  const bw = box.x1 - box.x0;
+  const bh = box.y1 - box.y0;
+  const w = fmtMeters(toMeters(scale, bw));
+  const h = fmtMeters(toMeters(scale, bh));
+  const yTop = box.y0 - 16;
+  const xLeft = box.x0 - 16;
   return (
     `<g pointer-events="none" stroke="${col}" stroke-width="1" fill="${col}" font-family="${FONT}" font-size="10.5">` +
-    `<line x1="${it.x}" y1="${yTop}" x2="${it.x + it.w}" y2="${yTop}"/>` +
-    `<line x1="${it.x}" y1="${yTop - 5}" x2="${it.x}" y2="${yTop + 5}"/>` +
-    `<line x1="${it.x + it.w}" y1="${yTop - 5}" x2="${it.x + it.w}" y2="${yTop + 5}"/>` +
-    `<text x="${it.x + it.w / 2}" y="${yTop - 5}" text-anchor="middle" stroke="none">${esc(w)}</text>` +
-    `<line x1="${xLeft}" y1="${it.y}" x2="${xLeft}" y2="${it.y + it.h}"/>` +
-    `<line x1="${xLeft - 5}" y1="${it.y}" x2="${xLeft + 5}" y2="${it.y}"/>` +
-    `<line x1="${xLeft - 5}" y1="${it.y + it.h}" x2="${xLeft + 5}" y2="${it.y + it.h}"/>` +
-    `<text transform="translate(${xLeft - 5} ${it.y + it.h / 2}) rotate(-90)" text-anchor="middle" stroke="none">${esc(h)}</text>` +
+    `<line x1="${box.x0}" y1="${yTop}" x2="${box.x1}" y2="${yTop}"/>` +
+    `<line x1="${box.x0}" y1="${yTop - 5}" x2="${box.x0}" y2="${yTop + 5}"/>` +
+    `<line x1="${box.x1}" y1="${yTop - 5}" x2="${box.x1}" y2="${yTop + 5}"/>` +
+    `<text x="${box.x0 + bw / 2}" y="${yTop - 5}" text-anchor="middle" stroke="none">${esc(w)}</text>` +
+    `<line x1="${xLeft}" y1="${box.y0}" x2="${xLeft}" y2="${box.y1}"/>` +
+    `<line x1="${xLeft - 5}" y1="${box.y0}" x2="${xLeft + 5}" y2="${box.y0}"/>` +
+    `<line x1="${xLeft - 5}" y1="${box.y1}" x2="${xLeft + 5}" y2="${box.y1}"/>` +
+    `<text transform="translate(${xLeft - 5} ${box.y0 + bh / 2}) rotate(-90)" text-anchor="middle" stroke="none">${esc(h)}</text>` +
     `</g>`
   );
 }

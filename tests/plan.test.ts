@@ -12,7 +12,7 @@ import { buildExportSvg } from '../src/io/exporter';
 import { niceScaleBar } from '../src/render/scaleBar';
 
 const room = (id: number, x: number, y: number, w: number, h: number, kind: Room['kind'] = 'autre', label = ''): Item => ({
-  id, type: 'room', x, y, w, h, label, kind,
+  id, type: 'room', x, y, w, h, label, kind, parts: [],
 });
 const sym = (id: number, kind: string, x: number, y: number): Item => ({
   id, type: 'symbol', kind, x, y, rot: 0, label: '', circuit: '', height: null,
@@ -280,3 +280,169 @@ describe('exports du plan', () => {
 // Garde-fou de typage : les brouillons d'exemple respectent bien NewItem.
 const _check: NewItem[] = examplePlan().items;
 void _check;
+
+// ---------------------------------------------------------------- pièces composées (fusion)
+
+import { detachRoomPart, mergeRoomsInto } from '../src/core/actions';
+import { translateItem, itemBounds } from '../src/domain/geometry';
+import { detachPart, isConnected, mergeRooms, outlineSegments, roomArea, roomContains, unionArea } from '../src/domain/plan/rooms';
+
+describe('pièces composées', () => {
+  const perimeter = (segs: [number, number, number, number][]) =>
+    segs.reduce((s, [x1, y1, x2, y2]) => s + Math.abs(x2 - x1) + Math.abs(y2 - y1), 0);
+
+  // Une pièce en L : un grand rectangle 200×100 et un bras 100×100 en dessous à gauche.
+  const L = [
+    { x: 0, y: 0, w: 200, h: 100 },
+    { x: 0, y: 100, w: 100, h: 100 },
+  ];
+
+  it('calcule la surface de l’union, recouvrements comptés une fois', () => {
+    expect(unionArea(L)).toBe(30000);
+    expect(unionArea([{ x: 0, y: 0, w: 100, h: 100 }, { x: 50, y: 0, w: 100, h: 100 }])).toBe(15000);
+    expect(unionArea([{ x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 0, w: 100, h: 100 }])).toBe(10000);
+    expect(unionArea([])).toBe(0);
+  });
+
+  it('trace le contour extérieur sans les arêtes communes', () => {
+    // Périmètre du L : 200 + 100 + 100 + 100 + 100 + 200 = 800 ; l'arête commune (0–100, y=100) disparaît.
+    expect(perimeter(outlineSegments(L))).toBe(800);
+    // Un rectangle seul : 2 × (w + h).
+    expect(perimeter(outlineSegments([{ x: 0, y: 0, w: 100, h: 50 }]))).toBe(300);
+    // Deux rectangles côte à côte forment un grand rectangle 200×100 : périmètre 600.
+    expect(perimeter(outlineSegments([{ x: 0, y: 0, w: 100, h: 100 }, { x: 100, y: 0, w: 100, h: 100 }]))).toBe(600);
+  });
+
+  it('reconnaît qu’un point appartient à n’importe laquelle des parties', () => {
+    const room = { ...room0(), parts: [L[1] as { x: number; y: number; w: number; h: number }] };
+    expect(roomContains(room, 150, 50)).toBe(true); // rectangle principal
+    expect(roomContains(room, 50, 150)).toBe(true); // partie
+    expect(roomContains(room, 150, 150)).toBe(false); // le creux du L
+  });
+
+  function room0(): Room {
+    return { id: 1, type: 'room', x: 0, y: 0, w: 200, h: 100, label: 'Salon', kind: 'sejour', parts: [] };
+  }
+
+  it('fusionne : la pièce garde son nom, absorbe les rectangles et leurs parties', () => {
+    const a = room0();
+    const b: Room = { id: 2, type: 'room', x: 0, y: 100, w: 100, h: 100, label: 'Coin', kind: 'autre', parts: [{ x: 100, y: 100, w: 20, h: 20 }] };
+    const merged = mergeRooms(a, b);
+    expect(merged.label).toBe('Salon');
+    expect(merged.kind).toBe('sejour');
+    expect(merged.parts).toHaveLength(2);
+    expect(roomArea(merged)).toBe(20000 + 10000 + 400);
+  });
+
+  it('détache une partie sans perdre la pièce', () => {
+    const merged = mergeRooms(room0(), { ...room0(), id: 2, x: 0, y: 100, w: 100, h: 100 });
+    const res = detachPart(merged, 0);
+    expect(res?.room.parts).toHaveLength(0);
+    expect(res?.part).toEqual({ x: 0, y: 100, w: 100, h: 100 });
+    expect(detachPart(merged, 5)).toBeNull();
+  });
+
+  it('détecte des parties qui ne se touchent pas', () => {
+    expect(isConnected(L)).toBe(true);
+    expect(isConnected([{ x: 0, y: 0, w: 10, h: 10 }, { x: 500, y: 500, w: 10, h: 10 }])).toBe(false);
+  });
+
+  it('le déplacement et la boîte englobante tiennent compte des parties', () => {
+    const merged = mergeRooms(room0(), { ...room0(), id: 2, x: 0, y: 100, w: 100, h: 100 });
+    expect(itemBounds(merged)).toEqual({ x0: 0, y0: 0, x1: 200, y1: 200 });
+    const moved = translateItem(merged, 40, 10);
+    expect(moved.parts[0]).toEqual({ x: 40, y: 110, w: 100, h: 100 });
+    expect(merged.parts[0]).toEqual({ x: 0, y: 100, w: 100, h: 100 }); // l'original n'est pas modifié
+  });
+
+  it('les équipements des parties comptent pour la pièce unique', () => {
+    const sejour: Room = { ...room0(), parts: [{ x: 0, y: 100, w: 100, h: 100 }] };
+    const doc = docWith([
+      sejour,
+      sym(2, 'prise', 150, 50),
+      sym(3, 'prise', 50, 150),
+      sym(4, 'lampe', 40, 180),
+    ]);
+    const stats = roomStats(doc);
+    expect(stats).toHaveLength(1);
+    expect(stats[0]).toMatchObject({ sockets: 2, lights: 1, merged: true });
+    expect(stats[0]?.area).toBeCloseTo((30000 / 400) * 0.25); // 75 carreaux × 0,25 m²
+    expect(roomAt([sejour], 50, 150)?.id).toBe(1);
+  });
+
+  it('une pièce fusionnée n’est plus comptée comme deux pièces ni deux fois en surface', () => {
+    const doc = docWith([
+      room(1, 0, 0, 200, 100, 'sejour', 'Salon'),
+      room(2, 200, 0, 40, 100, 'autre'),
+    ]);
+    expect(planSummary(doc).rooms).toBe(2);
+    const store = new Store(doc);
+    store.commit();
+    expect(mergeRoomsInto(store, 1, 2)).toBe(true);
+    const after = planSummary(store.state.doc);
+    expect(after.rooms).toBe(1);
+    expect(after.area).toBeCloseTo((240 * 100) / 400 * 0.25);
+  });
+
+  it('la fusion se fait par l’action, sélectionne la pièce conservée et s’annule', () => {
+    const store = new Store(docWith([room(1, 0, 0, 100, 100), room(2, 100, 0, 100, 100)]));
+    store.commit();
+    store.change((s) => (s.mergeFrom = 1));
+    expect(mergeRoomsInto(store, 1, 2)).toBe(true);
+    expect(store.state.selection).toBe(1);
+    expect(store.state.mergeFrom).toBeNull();
+    expect(store.state.doc.items).toHaveLength(1);
+    store.undo();
+    expect(store.state.doc.items).toHaveLength(2);
+  });
+
+  it('refuse de fusionner une pièce avec elle-même ou avec autre chose qu’une pièce', () => {
+    const store = new Store(docWith([room(1, 0, 0, 100, 100), sym(2, 'prise', 5, 5)]));
+    expect(mergeRoomsInto(store, 1, 1)).toBe(false);
+    expect(mergeRoomsInto(store, 1, 2)).toBe(false);
+    expect(mergeRoomsInto(store, 1, 99)).toBe(false);
+    expect(store.state.doc.items).toHaveLength(2);
+  });
+
+  it('détacher recrée une pièce du même type, sélectionnée', () => {
+    const doc = docWith([room(1, 0, 0, 100, 100, 'cuisine', 'Cuisine'), room(2, 100, 0, 50, 100)]);
+    doc.nextId = 10; // le compteur d'identifiants dépasse ceux des éléments existants
+    const store = new Store(doc);
+    store.commit();
+    mergeRoomsInto(store, 1, 2);
+    detachRoomPart(store, 1, 0);
+    const rooms = store.state.doc.items.filter((i): i is Room => i.type === 'room');
+    expect(rooms).toHaveLength(2);
+    const created = rooms.find((r) => r.id === store.state.selection);
+    expect(created).toMatchObject({ kind: 'cuisine', x: 100, w: 50, parts: [] });
+    expect(rooms.find((r) => r.id === 1)?.parts).toHaveLength(0);
+  });
+
+  it('les parties survivent à l’enregistrement et sont validées à la lecture', () => {
+    const doc = parseDoc({
+      items: [
+        {
+          id: 1,
+          type: 'room',
+          x: 0,
+          y: 0,
+          w: 100,
+          h: 100,
+          parts: [
+            { x: 100, y: 0, w: 50, h: 100 },
+            { x: 'x', y: 0, w: 10, h: 10 },
+            { x: 0, y: 0, w: -5, h: 10 },
+            'bidon',
+          ],
+        },
+      ],
+    });
+    const r = doc.items[0] as Room;
+    expect(r.parts).toEqual([{ x: 100, y: 0, w: 50, h: 100 }]);
+    expect(parseDoc(JSON.parse(JSON.stringify(doc))).items[0]).toEqual(r);
+  });
+
+  it('l’exemple et les anciens fichiers restent des pièces simples', () => {
+    expect(parseDoc({ items: [{ id: 1, type: 'room', x: 0, y: 0, w: 10, h: 10 }] }).items[0]).toMatchObject({ parts: [] });
+  });
+});

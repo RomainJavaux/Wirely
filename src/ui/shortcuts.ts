@@ -58,6 +58,10 @@ export function installShortcuts(store: Store, tools: ToolManager, canvas: Canva
         tools.active.finish();
         return;
       case 'Escape':
+        if (store.state.mergeFrom !== null) {
+          store.change((s) => (s.mergeFrom = null));
+          return;
+        }
         if (tools.active.hasDraft()) tools.active.cancel();
         else if (store.state.tool !== 'select') setTool(store, 'select');
         else store.change((s) => (s.selection = null));

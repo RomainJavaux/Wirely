@@ -445,3 +445,18 @@ aside input[type=number] { width: 100%; }
 .brand { display: inline-flex; align-items: center; margin-right: 6px; line-height: 0; border-radius: 8px; }
 .brand img { height: 30px; width: auto; display: block; }
 .brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- Pièces composées ---------- */
+ul.parts { list-style: none; padding: 0; margin: 6px 0 4px; display: grid; gap: 6px; }
+ul.parts li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  background: #f6f8fb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+ul.parts button { padding: 3px 8px; font-size: 12px; }

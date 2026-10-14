@@ -19,7 +19,7 @@ describe('géométrie', () => {
 
   it('calcule l’englobante de plusieurs éléments', () => {
     const items: Item[] = [
-      { id: 1, type: 'room', x: 0, y: 0, w: 100, h: 50, label: '', kind: 'autre' },
+      { id: 1, type: 'room', x: 0, y: 0, w: 100, h: 50, label: '', kind: 'autre', parts: [] },
       { id: 2, type: 'wall', points: [[-10, 5], [20, 80]] },
     ];
     expect(unionBounds(items)).toEqual({ x0: -10, y0: 0, x1: 100, y1: 80 });

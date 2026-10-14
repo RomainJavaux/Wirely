@@ -1,7 +1,7 @@
 import type { NewItem, Point, RoomKind, Rotation, WireTypeId } from '../types';
 
 const room = (x: number, y: number, w: number, h: number, label: string, kind: RoomKind): NewItem => ({
-  type: 'room', x, y, w, h, label, kind,
+  type: 'room', x, y, w, h, label, kind, parts: [],
 });
 const wall = (...points: Point[]): NewItem => ({ type: 'wall', points });
 const sym = (kind: string, x: number, y: number, rot: Rotation = 0, label = ''): NewItem => ({
