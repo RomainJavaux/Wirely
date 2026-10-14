@@ -8,6 +8,11 @@ import type { Doc, Item, ItemType, Point, Rotation, RoomKind, RoomRect } from '.
 
 export const DEFAULT_NAME = 'Mon installation';
 
+/** Hauteur sous plafond par défaut (cm) et bornes admises. */
+export const DEFAULT_CEILING = 250;
+export const MIN_CEILING = 180;
+export const MAX_CEILING = 500;
+
 /** Ordre de dessin : les pièces au fond, les textes au-dessus. */
 const DRAW_ORDER: readonly ItemType[] = ['room', 'wall', 'wire', 'symbol', 'text'];
 
@@ -16,6 +21,7 @@ export const createDoc = (name = DEFAULT_NAME): Doc => ({
   items: [],
   boards: [],
   scale: DEFAULT_SCALE,
+  ceiling: DEFAULT_CEILING,
   nextId: 1,
 });
 
@@ -121,6 +127,7 @@ export function parseDoc(raw: unknown): Doc {
     items,
     boards,
     scale: isNum(r.scale) && r.scale >= MIN_SCALE && r.scale <= MAX_SCALE ? r.scale : DEFAULT_SCALE,
+    ceiling: isNum(r.ceiling) && r.ceiling >= MIN_CEILING && r.ceiling <= MAX_CEILING ? Math.round(r.ceiling) : DEFAULT_CEILING,
     nextId: Math.max(maxId + 1, isNum(r.nextId) ? r.nextId : isNum(r.nid) ? r.nid : 1),
   };
 }

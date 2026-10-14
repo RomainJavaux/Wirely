@@ -522,3 +522,129 @@ li.circ .go { grid-area: go; padding: 2px 7px; }
 ul.items { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; font-size: 12.5px; }
 ul.items li { padding: 4px 8px; border-radius: 6px; cursor: pointer; }
 ul.items li:hover { background: #f1f4f9; }
+
+/* ---------- Murs : élévations et pose de l'appareillage ---------- */
+#wallsStage { flex: 1; position: relative; min-width: 0; display: flex; flex-direction: column; background: #eef1f6; }
+#wallsBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+#wallsTitle { font-size: 14px; min-width: 150px; text-align: center; }
+label.inl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+label.inl input[type=number] { width: 72px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+
+#wallsPalette {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #fafbfd;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+#wallsPalette .qk { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px; font-size: 12px; white-space: nowrap; }
+#wallsPalette .qk svg { width: 24px; height: 24px; flex: none; }
+
+#wallsScroll { flex: 1; overflow: auto; padding: 20px; }
+#wallsHost { width: max-content; margin: 0 auto; background: #fff; border-radius: 10px; box-shadow: 0 6px 18px rgba(31, 36, 48, .14); padding: 6px; }
+#wallsHost svg { display: block; user-select: none; touch-action: none; }
+.walls-empty { padding: 28px 30px; max-width: 420px; text-align: center; color: var(--muted); }
+.walls-empty h2 { margin: 0 0 6px; color: var(--text); font-size: 18px; }
+
+#wallsHint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(31, 36, 48, .88);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  pointer-events: none;
+  max-width: 70%;
+}
+
+aside.wide { width: 290px; }
+
+/* liste des pièces et de leurs murs */
+#wallsList details.room { border-bottom: 1px solid var(--line); padding: 2px 0; }
+#wallsList details.room > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  padding: 7px 2px;
+  font-weight: 600;
+}
+#wallsList details.room > summary::-webkit-details-marker { display: none; }
+#wallsList details.room > summary i { width: 12px; height: 12px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .15); flex: none; }
+#wallsList details.room > summary small { margin-left: auto; color: var(--muted); font-weight: 400; }
+#wallsList .faces { display: grid; gap: 4px; padding: 0 0 8px 20px; }
+#wallsList .face {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+#wallsList .face small { color: var(--muted); }
+#wallsList .face b { min-width: 20px; text-align: center; background: #eef1f6; border-radius: 999px; padding: 0 6px; font-size: 11px; }
+#wallsList .face.active { background: var(--accent-soft); border-color: var(--accent); }
+#wallsList .face.active b { background: #fff; }
+
+/* tableau des appareils du mur */
+table.items-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 6px 0 8px; }
+table.items-table th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 4px 4px; border-bottom: 1px solid var(--line); }
+table.items-table td { padding: 5px 4px; border-bottom: 1px solid #eef1f6; }
+table.items-table tbody tr { cursor: pointer; }
+table.items-table tbody tr:hover { background: #f1f4f9; }
+.wallbtns button small { color: var(--muted); }
+
+/* ---------- Vue 3D ---------- */
+#view3dStage { flex: 1; position: relative; min-width: 0; background: #eef1f6; overflow: hidden; }
+.v3d-canvas { position: absolute; inset: 0; }
+.v3d-canvas canvas { width: 100%; height: 100%; cursor: grab; }
+.v3d-compass { position: absolute; left: 14px; top: 14px; width: 44px; height: 44px; pointer-events: none; transform-origin: 50% 50%; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .18)); }
+.v3d-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); pointer-events: none; }
+.v3d-msg[hidden] { display: none; }
+.v3d-help {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(31, 36, 48, .88);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  pointer-events: none;
+  max-width: 80%;
+}
+.v3d-tip {
+  position: absolute;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .15);
+  pointer-events: none;
+  max-width: 220px;
+}
+.v3d-tip span { color: var(--muted); }
+.v3d-card { background: #f6f8fb; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.v3d-card p { margin: 6px 0 0; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.presets { display: grid; grid-template-columns: 1fr; gap: 5px; margin-bottom: 4px; }
+.presets button { text-align: left; }
+input[type=range] { width: 100%; }
+.chk-line { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.chk-line small { color: var(--muted); }

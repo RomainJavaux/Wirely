@@ -1,5 +1,6 @@
 import { buildBoard } from '../domain/board/templates';
 import { itemsOfCircuit, locateDevice } from '../domain/link/links';
+import { faceOfSymbol } from '../domain/walls/faces';
 import type { Store } from './store';
 
 /**
@@ -123,5 +124,36 @@ export function startAssigning(store: Store, deviceId: number): void {
     s.symbolKind = null;
     s.selection = null;
     if (hasItems) s.planFocus = { seq: nextSeq(), circuit: deviceId, itemId: null };
+  });
+}
+
+/** Ouvre l'éditeur de murs sur une face de pièce (et y sélectionne un appareil, si demandé). */
+export function showWall(store: Store, roomId: number, faceKey: string, itemId: number | null = null): void {
+  store.change((s) => {
+    s.mode = 'walls';
+    s.wallFace = { roomId, key: faceKey };
+    s.selection = itemId;
+    s.armedKind = null;
+  });
+}
+
+/**
+ * Va voir un appareil sur son mur. Retourne false si l'appareil n'est posé sur aucun mur
+ * (appareil de plafond, ou à l'écart des pièces).
+ */
+export function showItemOnWall(store: Store, itemId: number): boolean {
+  const item = store.getItem(itemId);
+  if (item?.type !== 'symbol') return false;
+  const found = faceOfSymbol(store.state.doc, item);
+  if (!found) return false;
+  showWall(store, found.room.id, found.face.key, itemId);
+  return true;
+}
+
+/** Passe en vue 3D, avec cet appareil sélectionné (et cadré). */
+export function showItemIn3D(store: Store, itemId: number | null = null): void {
+  store.change((s) => {
+    s.mode = 'view3d';
+    if (itemId !== null) s.selection = itemId;
   });
 }

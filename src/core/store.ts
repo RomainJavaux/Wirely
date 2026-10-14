@@ -17,8 +17,15 @@ export interface BoardFocus {
   deviceId: number;
 }
 
-/** Mode d'édition : plan de la maison ou tableau électrique. */
-export type Mode = 'plan' | 'board';
+/** Face de mur affichée dans l'éditeur de murs. */
+export interface WallFaceRef {
+  roomId: number;
+  /** Clé de la face dans la pièce (« N0 », « E0 »…). */
+  key: string;
+}
+
+/** Mode d'édition : plan de la maison, tableau électrique, murs (élévations) ou vue 3D. */
+export type Mode = 'plan' | 'board' | 'walls' | 'view3d';
 
 /** Ce que le plan affiche (n'affecte pas le document ni les exports). */
 export interface ViewOptions {
@@ -56,6 +63,8 @@ export interface AppState {
   activeCircuit: number | null;
   planFocus: PlanFocus | null;
   boardFocus: BoardFocus | null;
+  /** Mur affiché dans l'éditeur de murs (null : le premier de la première pièce). */
+  wallFace: WallFaceRef | null;
   /** Texte de recherche des circuits du tableau (met en retrait ce qui ne correspond pas). */
   boardFilter: string;
 }
@@ -96,6 +105,7 @@ export class Store {
       activeCircuit: null,
       planFocus: null,
       boardFocus: null,
+      wallFace: null,
       boardFilter: '',
     };
     this.history = [JSON.stringify(doc)];
@@ -197,6 +207,7 @@ export class Store {
     this.state.mergeFrom = null;
     this.state.activeCircuit = null;
     this.state.boardFilter = '';
+    this.state.wallFace = null;
     this.state.boardId = doc.boards[0]?.id ?? null;
     this.history = [JSON.stringify(doc)];
     this.cursor = 0;

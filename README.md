@@ -3,7 +3,7 @@
 Éditeur de plans électriques (maison, pièce…) et configurateur de tableau électrique,
 avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
 
-## Deux modes
+## Quatre vues
 
 - **Plan** : pièces typées (séjour, cuisine, chambre… avec leur couleur), murs, symboles
   (prises, interrupteurs, lampes, ouvertures…) et câbles par circuit, à l'**échelle** réelle.
@@ -29,6 +29,19 @@ avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
   « Derrière ce disjoncteur » (appareils, câbles, pièces desservies, accès direct au plan) et onglet
   **Circuits** pour les gros tableaux : liste groupée par différentiel, recherche (nom, pièce,
   repère, appareil…) qui met en retrait le reste de la face avant, défilement vers l'appareil.
+- **Murs** : pour chaque pièce, chaque mur est affiché **de face, vu de l'intérieur**, à l'échelle,
+  avec le quadrillage, la règle des hauteurs et les ouvertures. On pose les prises, interrupteurs,
+  appliques… en cliquant sur le mur, on les **glisse** (pas de 5 cm), ou on saisit la distance au coin
+  gauche ou droit et la **hauteur depuis le sol** ; les flèches déplacent au centimètre (Maj : 10 cm).
+  Un contrôle indicatif signale une prise au ras du sol ou une commande trop haute. Le plan reste la
+  source de vérité : déplacer un appareil sur le mur met à jour sa position sur le plan et sa
+  hauteur de pose (et inversement). La hauteur sous plafond est réglable (180–500 cm).
+- **3D** : maison en trois dimensions (Three.js, chargé à la première ouverture). Murs percés par les
+  portes et fenêtres, sols colorés par type de pièce, appareillage à sa vraie hauteur avec son
+  pictogramme, câbles au plafond. Coupe réglable des murs pour voir l'intérieur, vue du dessus, boussole,
+  **circuit en évidence** (le reste est atténué), clic sur un appareil pour ses détails et ses liens
+  vers le mur, le plan et le tableau.
+  La fiche exportée du plan contient les élévations des murs équipés.
 
 ## Lancer
 
@@ -70,13 +83,20 @@ src/
   domain/    Modèle pur, sans DOM : types, géométrie, catalogue de symboles, validation
     plan/    Plan : types de pièces, échelle et métriques, contrôles, exemple, exports CSV
     board/   Tableau électrique : appareils, placement sur rails, analyse, contrôles, nomenclature
+    link/    Lien plan <-> tableau : circuits, appareils raccordés, contrôles de raccordement
+    walls/   Murs : faces d'une pièce, hauteurs de pose, position sur un mur, contrôles
+    view3d/  Modèle 3D indépendant du moteur : boîtes (murs percés, sols), plaques, câbles
   core/      Store (état + historique annuler/rétablir), viewport, actions (plan et tableau)
   render/    Rendu SVG des éléments (partagé éditeur/export) et vue canevas
     board/   Appareils réalistes, face avant, schéma unifilaire
+    walls/   Élévation d'un mur (éditeur et export)
+    view3d/  Vue Three.js (chargée à la demande)
   tools/     Un outil par classe (sélection, pièce, mur/câble, symbole, texte)
   io/        Export (SVG/PNG/PDF/CSV), fiche du tableau, fichiers JSON, sauvegarde automatique
   ui/        Panneaux : barre du haut, palette, propriétés, raccourcis
     board/   Espace de travail du tableau : palette d'appareils, glisser-déposer, réglages
+    walls/   Espace de travail des murs : liste des faces, élévation éditable, panneau de réglage
+    view3d/  Espace de travail 3D : coupe, circuit en évidence, détails d'un appareil
   cloud/     Client d'API, authentification, synchronisation du projet ouvert (URL #/p/<id>)
   main.ts    Racine de composition
 tests/       Tests du domaine, du store, de l'export et du client d'API
@@ -103,8 +123,9 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
 
 ## Format de fichier
 
-JSON : `{ name, scale, nextId, items: [...], boards: [...] }` (`scale` : mètres par carreau).
-Les câbles et symboles portent `breaker` (identifiant d'un appareil du tableau, ou `null`) ; un
+JSON : `{ name, scale, ceiling, nextId, items: [...], boards: [...] }` (`scale` : mètres par carreau ;
+`ceiling` : hauteur sous plafond en cm, 250 par défaut). Un symbole porte `height` (hauteur de pose en
+cm, ou `null` : la hauteur usuelle du type). Les câbles et symboles portent `breaker` (identifiant d'un appareil du tableau, ou `null`) ; un
 symbole « tableau » porte `board`. Les anciens fichiers, où le circuit était un repère saisi à la
 main, sont migrés à l'ouverture sur le premier tableau. Les fichiers sont validés et normalisés à
 l'ouverture (`parseDoc`) ; les anciens fichiers (`nid`) restent lisibles.

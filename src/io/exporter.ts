@@ -1,11 +1,13 @@
 import { WIRE_TYPES, getSymbol } from '../domain/catalog';
 import { GRID, unionBounds } from '../domain/geometry';
 import { planBomRows, planSubtitle, roomRows } from '../domain/plan/export';
-import { allLinks, circuitOptions, circuitTitle, linksSummary } from '../domain/link/links';
-import { fmtLength, planSummary } from '../domain/plan/metrics';
+import { allLinks, circuitInfo, circuitOptions, circuitTitle, linksSummary } from '../domain/link/links';
+import { fmtLength, planSummary, roomsOf } from '../domain/plan/metrics';
 import type { Doc } from '../domain/types';
+import { roomFaces, symbolsOnFace } from '../domain/walls/faces';
 import { GLYPH_ATTRS, renderScene } from '../render/items';
 import { niceScaleBar } from '../render/scaleBar';
+import { renderElevation } from '../render/walls/elevationSvg';
 import { esc } from '../util/escape';
 import { composeSheet, table, type SheetSection } from './sheet';
 
@@ -146,11 +148,56 @@ function materialsSection(doc: Doc): SheetSection | null {
   return { title: 'Nomenclature', svg: t.svg, width: 1200, height: t.height };
 }
 
-/** Sections de la fiche du plan : plan coté, légende chiffrée, pièces, nomenclature. */
+const WALLS_WIDTH = 1200;
+const WALLS_GAP = 24;
+
+/**
+ * Élévations des murs équipés : position et hauteur de chaque prise, interrupteur, etc.
+ * Les élévations sont rangées côte à côte tant qu'elles tiennent dans la largeur de la fiche.
+ */
+function wallsSection(doc: Doc): SheetSection | null {
+  const circuits = circuitInfo(doc);
+  const rooms = roomsOf(doc.items).sort((a, b) => a.y - b.y || a.x - b.x);
+  const cells: { svg: string; width: number; height: number }[] = [];
+  for (const room of rooms) {
+    for (const face of roomFaces(room)) {
+      const equipped = symbolsOnFace(doc, face).some((p) => p.mounting.where !== 'opening');
+      if (!equipped) continue;
+      const scene = renderElevation(doc, room, face, { interactive: false, circuits });
+      cells.push({ svg: scene.svg, width: scene.width, height: scene.height });
+    }
+  }
+  if (cells.length === 0) return null;
+
+  let svg = '';
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  let widest = 0;
+  for (const c of cells) {
+    if (x > 0 && x + c.width > WALLS_WIDTH) {
+      y += rowH + WALLS_GAP;
+      x = 0;
+      rowH = 0;
+    }
+    svg += `<g transform="translate(${x} ${y})">${c.svg}</g>`;
+    x += c.width + WALLS_GAP;
+    rowH = Math.max(rowH, c.height);
+    widest = Math.max(widest, x - WALLS_GAP);
+  }
+  return { title: 'Élévations des murs', svg, width: widest, height: y + rowH };
+}
+
+/** Sections de la fiche du plan : plan coté, légende chiffrée, pièces, murs, circuits, nomenclature. */
 export function buildPlanSections(doc: Doc): SheetSection[] {
-  return [planSection(doc), legendSection(doc), roomsSection(doc), circuitsSection(doc), materialsSection(doc)].filter(
-    (s): s is SheetSection => s !== null,
-  );
+  return [
+    planSection(doc),
+    legendSection(doc),
+    roomsSection(doc),
+    wallsSection(doc),
+    circuitsSection(doc),
+    materialsSection(doc),
+  ].filter((s): s is SheetSection => s !== null);
 }
 
 export const planSheetHeader = (doc: Doc, date = new Date()) => ({

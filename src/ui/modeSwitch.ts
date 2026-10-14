@@ -1,13 +1,21 @@
 import type { Mode, Store } from '../core/store';
 import { qs } from './dom';
 
-/** Bascule entre le plan et le tableau électrique. */
+/** Zone principale de chaque mode : une seule est visible à la fois. */
+const MAINS: Readonly<Record<Mode, string>> = {
+  plan: '#planMain',
+  board: '#boardMain',
+  walls: '#wallsMain',
+  view3d: '#view3dMain',
+};
+
+/** Bascule entre le plan, le tableau, les murs et la vue 3D. */
 export class ModeSwitch {
-  private readonly planMain = qs<HTMLElement>('#planMain');
-  private readonly boardMain = qs<HTMLElement>('#boardMain');
+  private readonly mains = (Object.keys(MAINS) as Mode[]).map((mode) => ({ mode, el: qs<HTMLElement>(MAINS[mode]) }));
+  private readonly tabs = [...document.querySelectorAll<HTMLElement>('.tabs [data-mode]')];
 
   constructor(private readonly store: Store) {
-    document.querySelectorAll<HTMLElement>('[data-mode]').forEach((b) => {
+    this.tabs.forEach((b) => {
       b.addEventListener('click', () => {
         const mode = b.dataset.mode as Mode;
         store.change((s) => {
@@ -22,9 +30,8 @@ export class ModeSwitch {
 
   private sync(): void {
     const { mode } = this.store.state;
-    this.planMain.toggleAttribute('hidden', mode !== 'plan');
-    this.boardMain.toggleAttribute('hidden', mode !== 'board');
-    document.querySelectorAll<HTMLElement>('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    for (const m of this.mains) m.el.toggleAttribute('hidden', m.mode !== mode);
+    this.tabs.forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     document.body.dataset.mode = mode;
   }
 }

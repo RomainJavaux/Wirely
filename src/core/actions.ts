@@ -1,4 +1,5 @@
 import { translateItem } from '../domain/geometry';
+import { MAX_CEILING, MIN_CEILING } from '../domain/document';
 import { isElectrical } from '../domain/link/links';
 import { MAX_SCALE, MIN_SCALE } from '../domain/plan/metrics';
 import { detachPart, mergeRooms } from '../domain/plan/rooms';
@@ -141,5 +142,14 @@ export function detachRoomPart(store: Store, roomId: number, index: number): voi
   doc.items = doc.items.map((i) => (i.id === roomId ? result.room : i));
   doc.items.push(detached);
   store.state.selection = detached.id;
+  store.commit();
+}
+
+/** Hauteur sous plafond en cm, bornée. */
+export function setCeiling(store: Store, cm: number): void {
+  if (!Number.isFinite(cm)) return;
+  const ceiling = Math.min(MAX_CEILING, Math.max(MIN_CEILING, Math.round(cm)));
+  if (ceiling === store.state.doc.ceiling) return;
+  store.state.doc.ceiling = ceiling;
   store.commit();
 }

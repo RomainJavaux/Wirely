@@ -1,13 +1,13 @@
 import { deleteSelection, detachRoomPart, duplicateSelection, rotateSelection, setTool, startMerge } from '../core/actions';
 import {
-  assignBreaker,
   createLinkedBoard,
   linkSymbolToBoard,
   openBoard,
-  showDeviceInBoard,
+  showItemIn3D,
+  showItemOnWall,
+  showWall,
 } from '../core/links';
 import {
-  circuitFromTitle,
   circuitLinks,
   circuitOptions,
   circuitTitle,
@@ -32,7 +32,10 @@ import {
 } from '../domain/plan/metrics';
 import { ROOM_KINDS, ROOM_KIND_IDS, getRoomKind } from '../domain/plan/roomKinds';
 import type { Item, RoomKind, WireTypeId } from '../domain/types';
+import { faceLabel, faceLengthCm, faceOfSymbol, roomFaces, symbolsOnFace } from '../domain/walls/faces';
+import { effectiveHeight, isCeilingKind } from '../domain/walls/mounting';
 import { esc } from '../util/escape';
+import { bindBreakerField, breakerFieldHtml } from './breakerField';
 import { qs } from './dom';
 
 const TITLES: Record<Item['type'], string> = {
@@ -187,22 +190,6 @@ export class PropertiesPanel {
 
   // ---------------------------------------------------------------- formulaire
 
-  /** Champ « Disjoncteur » : recherche par saisie dans la liste des circuits de tous les tableaux. */
-  private breakerField(breaker: number | null): string {
-    const { doc } = this.store.state;
-    const options = circuitOptions(doc);
-    const current = breaker !== null ? options.find((o) => o.id === breaker) : undefined;
-    const none = options.length === 0;
-    return `<label class="f" for="pBreaker">Disjoncteur</label>
-      <div class="ac">
-        <input type="text" id="pBreaker" list="circuitList" autocomplete="off"
-          value="${esc(current ? circuitTitle(doc, current) : '')}"
-          placeholder="${none ? 'Aucun tableau' : 'Rechercher un circuit…'}"${none ? ' disabled' : ''}>
-        ${current ? '<button type="button" id="pBreakerGo" title="Voir ce disjoncteur dans le tableau">Tableau ↗</button>' : ''}
-      </div>
-      <datalist id="circuitList">${options.map((o) => `<option value="${esc(circuitTitle(doc, o))}"></option>`).join('')}</datalist>`;
-  }
-
   /** Pour un symbole « tableau » : tableau représenté, ouverture et création. */
   private boardField(boardId: number | null): string {
     const { doc } = this.store.state;
@@ -221,6 +208,52 @@ export class PropertiesPanel {
         <button type="button" id="pNewBoard">Créer un tableau</button>
       </div>
       ${linked ? `<p class="muted"><b>${circuits}</b> circuit${circuits > 1 ? 's' : ''}, dont <b>${wired}</b> raccordé${wired > 1 ? 's' : ''} à des lignes du plan.</p>` : ''}`;
+  }
+
+  /** Pour un symbole : position sur son mur, et accès à l'éditeur de murs et à la vue 3D. */
+  private wallLinks(id: number): string {
+    const { doc } = this.store.state;
+    const item = this.store.getItem(id);
+    if (item?.type !== 'symbol') return '';
+    const ceiling = isCeilingKind(item.kind);
+    const found = ceiling ? null : faceOfSymbol(doc, item);
+    let info: string;
+    if (ceiling) {
+      info = '<p class="muted">Appareil de plafond : visible dans la vue 3D.</p>';
+    } else if (found) {
+      const placed = symbolsOnFace(doc, found.face).find((p) => p.item.id === id);
+      const where = placed
+        ? `à <b>${Math.round(placed.u)} cm</b> du coin gauche, ${
+            placed.mounting.where === 'opening'
+              ? `allège <b>${Math.round(placed.v)} cm</b>`
+              : `à <b>${Math.round(effectiveHeight(item))} cm</b> du sol`
+          }`
+        : '';
+      const name = found.room.label.trim() || getRoomKind(found.room.kind).name;
+      info = `<p class="muted">${esc(faceLabel(found.face, roomFaces(found.room)))} · ${esc(name)}${where ? `<br>${where}` : ''}</p>`;
+    } else {
+      info = "<p class=\"muted\">Pas posé sur un mur : rapprochez-le d'un mur pour le régler en élévation.</p>";
+    }
+    return `<h3>Sur le mur</h3>${info}
+      <div class="row">
+        <button type="button" id="pWall"${found ? '' : ' disabled'} title="Régler la position et la hauteur sur le mur">Voir sur le mur ↗</button>
+        <button type="button" id="p3d" title="Voir dans la vue 3D">3D ↗</button>
+      </div>`;
+  }
+
+  /** Pour une pièce : un bouton par mur, avec sa longueur. */
+  private roomWalls(id: number): string {
+    const { doc } = this.store.state;
+    const room = this.store.getItem(id);
+    if (room?.type !== 'room') return '';
+    const faces = roomFaces(room);
+    return `<h3>Murs</h3>
+      <div class="row wallbtns">${faces
+        .map(
+          (f) =>
+            `<button type="button" data-face="${f.key}">${esc(faceLabel(f, faces))} <small>${(faceLengthCm(doc, f) / 100).toFixed(2).replace('.', ',')} m</small></button>`,
+        )
+        .join('')}</div>`;
   }
 
   private form(item: Item): string {
@@ -273,7 +306,7 @@ export class PropertiesPanel {
       const room = roomAt(roomsOf(doc.items), item.x, item.y);
       h += `<label class="f" for="pLabel">Nom / repère</label>
         <input type="text" id="pLabel" value="${esc(item.label)}" placeholder="ex. Prise plan de travail">`;
-      if (isElectrical(item)) h += this.breakerField(item.breaker);
+      if (isElectrical(item)) h += breakerFieldHtml(this.store, item.breaker);
       if (item.kind === 'tableau') h += this.boardField(item.board);
       h += `<label class="f" for="pHeight">Hauteur de pose (cm)</label>
         <input type="number" id="pHeight" list="heightList" min="0" max="400" step="5" value="${item.height ?? ''}" placeholder="—">
@@ -286,7 +319,7 @@ export class PropertiesPanel {
         (id) => `<option value="${id}"${id === item.wtype ? ' selected' : ''}>${esc(WIRE_TYPES[id].name)}</option>`,
       ).join('');
       h += `<label class="f" for="pWire">Type de câble</label><select id="pWire">${options}</select>
-        ${this.breakerField(item.breaker)}
+        ${breakerFieldHtml(this.store, item.breaker)}
         <p class="muted">Longueur : <b>${fmtLength(wireLengthM(doc, item))}</b></p>`;
     }
 
@@ -304,6 +337,8 @@ export class PropertiesPanel {
       <button id="pDup">Dupliquer</button>
       <button id="pDel" class="danger">Supprimer</button>
     </div>`;
+    if (item.type === 'symbol') h += this.wallLinks(item.id);
+    if (item.type === 'room') h += this.roomWalls(item.id);
     return h;
   }
 
@@ -325,23 +360,10 @@ export class PropertiesPanel {
     text('#pText', (i, v) => (i.type === 'text' ? { ...i, text: v } : i));
 
     // Disjoncteur : saisie dans la liste ; une valeur inconnue est annulée.
-    const breaker = $<HTMLInputElement>('#pBreaker');
-    if (breaker) {
-      breaker.onchange = () => {
-        const text = breaker.value.trim();
-        const found = text ? circuitFromTitle(store.state.doc, text) : null;
-        if (text && !found) {
-          this.key = ''; // saisie inconnue : on reconstruit le panneau avec la valeur actuelle
-          this.render();
-          return;
-        }
-        assignBreaker(store, id, found ? found.id : null);
-      };
-    }
-    const linkedBreaker = (): number | null => {
-      const it = store.getItem(id);
-      return it && (it.type === 'wire' || it.type === 'symbol') ? it.breaker : null;
-    };
+    bindBreakerField(this.el, store, id, () => {
+      this.key = ''; // saisie inconnue : on reconstruit le panneau avec la valeur actuelle
+      this.render();
+    });
 
     // Symbole « tableau » : lien vers un tableau.
     const boardSel = $<HTMLSelectElement>('#pBoard');
@@ -392,15 +414,16 @@ export class PropertiesPanel {
       if (b) b.onclick = fn;
     };
     on('#pMerge', () => startMerge(store));
-    on('#pBreakerGo', () => {
-      const b = linkedBreaker();
-      if (b !== null) showDeviceInBoard(store, b);
-    });
+    on('#pWall', () => showItemOnWall(store, id));
+    on('#p3d', () => showItemIn3D(store, id));
     on('#pOpenBoard', () => {
       const it = store.getItem(id);
       if (it?.type === 'symbol' && it.board !== null) openBoard(store, it.board);
     });
     on('#pNewBoard', () => createLinkedBoard(store, id));
+    this.el.querySelectorAll<HTMLButtonElement>('[data-face]').forEach((b) => {
+      b.onclick = () => showWall(store, id, b.dataset.face as string);
+    });
     this.el.querySelectorAll<HTMLButtonElement>('[data-detach]').forEach((b) => {
       b.onclick = () => detachRoomPart(store, id, Number(b.dataset.detach));
     });

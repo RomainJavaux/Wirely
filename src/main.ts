@@ -18,6 +18,8 @@ import { installShortcuts } from './ui/shortcuts';
 import { Sidebar } from './ui/sidebar';
 import { Stage } from './ui/stage';
 import { Toolbar } from './ui/toolbar';
+import { View3dWorkspace } from './ui/view3d/view3dWorkspace';
+import { WallWorkspace } from './ui/walls/wallWorkspace';
 
 /** Racine de composition : assemble les couches, sans logique métier. */
 function bootstrap(): void {
@@ -51,6 +53,8 @@ function bootstrap(): void {
   const cloud = new Cloud(store, auth);
 
   new BoardWorkspace(store);
+  new WallWorkspace(store);
+  new View3dWorkspace(store);
   new Sidebar(store);
   new CloudBar(auth, cloud);
   new Toolbar(store, cloud, fit);

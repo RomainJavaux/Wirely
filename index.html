@@ -16,6 +16,8 @@
     <div class="tabs" role="tablist" aria-label="Mode d'édition">
       <button data-mode="plan" class="active">🏠 Plan</button>
       <button data-mode="board">🔌 Tableau</button>
+      <button data-mode="walls">▤ Murs</button>
+      <button data-mode="view3d">🧊 3D</button>
     </div>
     <input id="docName" type="text" placeholder="Nom du projet" aria-label="Nom du projet">
     <span class="sep"></span>
@@ -150,6 +152,36 @@
     </div>
 
     <aside class="right" id="boardSide"></aside>
+  </main>
+
+  <main id="wallsMain" hidden>
+    <aside class="left" id="wallsList" aria-label="Pièces et murs"></aside>
+
+    <div id="wallsStage">
+      <div id="wallsBar">
+        <button id="wPrev" title="Mur précédent">◀</button>
+        <strong id="wallsTitle"></strong>
+        <button id="wNext" title="Mur suivant">▶</button>
+        <span class="sep"></span>
+        <label class="inl" title="Hauteur sous plafond, commune à toutes les pièces">Plafond
+          <input id="wCeiling" type="number" inputmode="numeric" min="180" max="500" step="5"> cm
+        </label>
+        <span class="spacer"></span>
+        <button id="wZoomOut" title="Dézoomer">−</button>
+        <button id="wFit" title="Ajuster à la fenêtre">Ajuster</button>
+        <button id="wZoomIn" title="Zoomer">+</button>
+      </div>
+      <div id="wallsPalette"></div>
+      <div id="wallsScroll"><div id="wallsHost"></div></div>
+      <div id="wallsHint"></div>
+    </div>
+
+    <aside class="right wide" id="wallsSide"></aside>
+  </main>
+
+  <main id="view3dMain" hidden>
+    <div id="view3dStage"></div>
+    <aside class="right" id="view3dSide"></aside>
   </main>
 
   <script type="module" src="/src/main.ts"></script>

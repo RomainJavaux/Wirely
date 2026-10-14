@@ -101,6 +101,8 @@ export interface Doc {
   boards: Board[];
   /** Échelle du plan : mètres représentés par un carreau de la grille. */
   scale: number;
+  /** Hauteur sous plafond, en cm (élévations des murs et vue 3D). */
+  ceiling: number;
   /** Compteur d'identifiants partagé par le plan et les tableaux. */
   nextId: number;
 }
