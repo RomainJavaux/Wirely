@@ -105,7 +105,7 @@ git push
 
 1. **Créer la base MySQL** dans hPanel (Bases de données → Gestion MySQL) : notez le nom de la
    base, l'utilisateur et le mot de passe (Hostinger les préfixe, par exemple `u123456789_wirely`).
-2. **En SSH** (PHP 8.4.1 ou plus, à régler dans hPanel **pour le site** et pas seulement pour le terminal), dans le dossier du site :
+2. **En SSH** (PHP 8.3 ou plus ; 8.4 convient aussi. Le réglage de hPanel est **par site**, distinct de celui du terminal), dans le dossier du site :
 
 ```bash
 cd backend
@@ -123,10 +123,14 @@ Vérifications :
 - `https://<votre-domaine>/backend/.env` répond **404**.
 
 Ensuite, un `git push` suffit. Si une mise à jour ajoute une migration, relancez
-`php artisan migrate --force` dans `backend/`.
+`php artisan migrate --force` dans `backend/`. Si `backend/composer.lock` a changé (dépendances
+mises à jour), relancez aussi `composer install --no-dev --optimize-autoloader` dans `backend/`.
 
 ### En cas de problème (erreur 500 à la création de compte, etc.)
 
 Ouvrez `https://<votre-domaine>/api/status` dans le navigateur : la page teste le serveur depuis
 le contexte web (version de PHP, droits d'écriture, cache, base, tables) et indique quoi corriger.
 Le détail technique de l'erreur est dans `backend/storage/logs/laravel.log`.
+
+Les dépendances sont résolues pour **PHP 8.3** (`config.platform` dans `backend/composer.json`),
+ce qui garde l'application compatible avec les hébergements encore en 8.3.
