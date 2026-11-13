@@ -40,3 +40,27 @@ describe('Viewport.fit', () => {
     expect([v.k, v.x, v.y]).toEqual([1, 400, 300]);
   });
 });
+
+describe('Viewport.pinch', () => {
+  it('zoome autour du milieu des doigts et suit leur déplacement', () => {
+    const v = new Viewport();
+    v.fit({ x0: 0, y0: 0, x1: 400, y1: 300 }, 1000, 700);
+    const under = v.toWorld(300, 200); // point du plan sous le milieu des doigts
+    v.pinch(300, 200, 1.5, 40, -10);
+    // Le même point du plan se retrouve sous les doigts, qui ont glissé de (40, -10).
+    const after = v.toWorld(340, 190);
+    expect(after[0]).toBeCloseTo(under[0]);
+    expect(after[1]).toBeCloseTo(under[1]);
+  });
+
+  it('reste dans les bornes du zoom et prévient une seule fois', () => {
+    const v = new Viewport();
+    let calls = 0;
+    v.subscribe(() => calls++);
+    v.pinch(0, 0, 100, 0, 0);
+    expect(v.k).toBe(4);
+    v.pinch(0, 0, 0.0001, 0, 0);
+    expect(v.k).toBe(0.2);
+    expect(calls).toBe(2);
+  });
+});

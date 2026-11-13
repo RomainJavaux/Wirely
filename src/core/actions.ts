@@ -1,14 +1,14 @@
 import { translateItem } from '../domain/geometry';
 import { MAX_CEILING, MIN_CEILING } from '../domain/document';
-import { suggestCircuit } from '../domain/link/autoCircuits';
+import { buildBoardFromPlan, planCircuits, suggestCircuit } from '../domain/link/autoCircuits';
 import { circuitOptions, circuitTitle, isElectrical } from '../domain/link/links';
 import { wallRealignments } from '../domain/walls/snap';
+import { contentsOf, settle, translateRoom } from '../domain/plan/arrange';
 import { MAX_SCALE, MIN_SCALE } from '../domain/plan/metrics';
 import { detachPart, mergeRooms } from '../domain/plan/rooms';
-import { buildBoard } from '../domain/board/templates';
-import { examplePlan, linkExample } from '../domain/plan/templates';
-import type { Board } from '../domain/board/types';
-import type { NewItem, Item, Rotation, Room } from '../domain/types';
+import { examplePlan } from '../domain/plan/templates';
+import { rulesOf } from '../domain/rules';
+import type { NewItem, Item, Rotation, Room, SymbolItem } from '../domain/types';
 import { notify } from './planActions';
 import type { Store } from './store';
 
@@ -69,11 +69,17 @@ export function setTool(store: Store, tool: Store['state']['tool'], symbolKind: 
   });
 }
 
-/** Décale la sélection de (dx, dy) unités du plan et valide. */
+/** Décale la sélection de (dx, dy) unités du plan et valide. Une pièce emporte ses points. */
 export function moveSelection(store: Store, dx: number, dy: number): void {
   const item = store.selectedItem;
   if (!item) return;
-  store.updateItem(translateItem(item, dx, dy));
+  if (item.type === 'room') {
+    const { doc } = store.state;
+    const ids = new Set(contentsOf(doc.items, item).map((s) => s.id));
+    doc.items = translateRoom(doc.items, item, ids, dx, dy).map((i) => (i.id === item.id ? settle(i) : i));
+  } else {
+    store.updateItem(settle(translateItem(item, dx, dy)));
+  }
   store.commit();
 }
 
@@ -86,34 +92,64 @@ export function setScale(store: Store, metersPerCell: number): void {
   store.commit();
 }
 
+/** Renseignements fictifs du chantier d'exemple, selon le pays. */
+const EXAMPLE_INFO = {
+  BE: { client: 'M. et Mme Lambert', address: 'Rue des Tilleuls 12, 4000 Liège', cooker: 'Taque de cuisson' },
+  FR: { client: 'M. et Mme Lambert', address: '12 rue des Tilleuls, 69003 Lyon', cooker: 'Plaque de cuisson' },
+} as const;
+
 /**
- * Charge l'appartement d'exemple, avec un tableau « logement » dont les disjoncteurs sont déjà
- * reliés aux câbles et appareils du plan. Retourne false si le plan contient déjà des éléments.
+ * Charge l'appartement d'exemple. Son tableau est déduit des points, selon le pays du chantier
+ * (comme le ferait « Raccorder ») : chaque appareil, chaque câble et le symbole du tableau y sont
+ * reliés. Retourne false si le plan contient déjà des éléments.
  */
 export function loadExamplePlan(store: Store): boolean {
   const doc = store.state.doc;
   if (doc.items.length > 0) return false;
   const example = examplePlan();
+  const rules = rulesOf(doc);
+  const info = EXAMPLE_INFO[rules.country];
 
-  let board: Board | null = null;
-  if (doc.boards.length === 0) {
-    board = buildBoard('logement', 'Tableau principal', () => doc.nextId++);
-    board.location = 'Entrée';
-    doc.boards.push(board);
-    store.state.boardId = board.id;
-  }
-
-  const items = example.items.map((draft) => ({ ...draft, id: doc.nextId++ }) as Item);
+  let items = example.items.map((draft) => ({ ...draft, id: doc.nextId++ }) as Item);
   // L'exemple est dessiné « à l'œil » : on accroche les appareils aux murs, comme le fait la pose.
   const moves = new Map(wallRealignments({ items, scale: doc.scale }).map((m) => [m.id, m] as const));
-  items.forEach((it, i) => {
+  items = items.map((it) => {
+    if (it.type !== 'symbol') return it;
     const m = moves.get(it.id);
-    if (m && it.type === 'symbol') items[i] = { ...it, x: m.x, y: m.y, rot: m.rot };
+    const placed = m ? { ...it, x: m.x, y: m.y, rot: m.rot } : it;
+    // Le vocabulaire suit le pays (« taque » en Belgique, « plaque » en France).
+    return placed.label === 'Plaque de cuisson' ? { ...placed, label: info.cooker } : placed;
   });
-  if (board) linkExample(items, board);
+
+  if (doc.boards.length === 0) {
+    const gen = buildBoardFromPlan(planCircuits({ items, project: doc.project }), 'Tableau principal', () => doc.nextId++, rules);
+    if (gen) {
+      gen.board.location = 'Entrée';
+      const byItem = new Map<number, number>();
+      for (const { plan, device } of gen.circuits) for (const id of plan.itemIds) byItem.set(id, device.id);
+      items = items.map((it) => {
+        if (it.type !== 'symbol') return it;
+        if (it.kind === 'tableau') return { ...it, board: gen.board.id };
+        const dev = byItem.get(it.id);
+        return dev === undefined ? it : { ...it, breaker: dev };
+      });
+      // Chaque câble suit le circuit de l'appareil qu'il alimente (celui de son extrémité).
+      const linked = items.filter((it): it is SymbolItem => it.type === 'symbol' && it.breaker !== null);
+      items = items.map((it) => {
+        if (it.type !== 'wire') return it;
+        const end = it.points[it.points.length - 1];
+        const fed = end && linked.find((s) => Math.hypot(s.x - end[0], s.y - end[1]) <= 15);
+        return fed ? { ...it, breaker: fed.breaker } : it;
+      });
+      doc.boards.push(gen.board);
+      store.state.boardId = gen.board.id;
+    }
+  }
   doc.items.push(...items);
 
   if (doc.name === 'Mon installation') doc.name = example.name;
+  if (!doc.project.client.trim()) doc.project.client = info.client;
+  if (!doc.project.address.trim()) doc.project.address = info.address;
   store.state.selection = null;
   store.commit();
   return true;

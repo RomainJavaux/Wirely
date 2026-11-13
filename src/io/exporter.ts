@@ -18,8 +18,11 @@ import { composeSheet, table, type SheetSection } from './sheet';
 const FONT = 'Arial,sans-serif';
 const PAD = 40;
 
-/** Section « Plan » : le plan coté, avec sa barre d'échelle. */
-function planSection(doc: Doc): SheetSection {
+/**
+ * Section « Plan » : le plan avec sa barre d'échelle. `refs` affiche le repère de chaque point
+ * (schéma de position) ; sans lui, seuls les repères de circuit figurent.
+ */
+export function planSection(doc: Doc, refs?: ReadonlyMap<number, string>): SheetSection {
   const b = unionBounds(doc.items) ?? { x0: 0, y0: 0, x1: 400, y1: 300 };
   const w = b.x1 - b.x0 + PAD * 2;
   const h = b.y1 - b.y0 + PAD * 2;
@@ -36,7 +39,12 @@ function planSection(doc: Doc): SheetSection {
   // Un petit plan est agrandi pour occuper la largeur de la fiche (jusqu'à 2,5×), texte compris.
   const zoom = Math.min(2.5, Math.max(1, 1000 / Math.max(w, 360)));
   const content =
-    `<g transform="translate(${PAD - b.x0} ${PAD - b.y0})">${renderScene(doc, { interactive: false, scale: doc.scale })}</g>` +
+    `<g transform="translate(${PAD - b.x0} ${PAD - b.y0})">${renderScene(doc, {
+      interactive: false,
+      scale: doc.scale,
+      circuits: circuitInfo(doc),
+      ...(refs ? { refs } : {}),
+    })}</g>` +
     scaleBar;
 
   return {
@@ -49,7 +57,7 @@ function planSection(doc: Doc): SheetSection {
 }
 
 /** Légende chiffrée : chaque symbole avec sa quantité, chaque type de câble avec sa longueur. */
-function legendSection(doc: Doc): SheetSection | null {
+export function legendSection(doc: Doc): SheetSection | null {
   const s = planSummary(doc);
   interface Cell {
     glyph: string;
@@ -94,7 +102,7 @@ function legendSection(doc: Doc): SheetSection | null {
   return { key: 'legend', title: 'Légende', svg, width: colW * 2, height: perCol * rowH };
 }
 
-function roomsSection(doc: Doc): SheetSection | null {
+export function roomsSection(doc: Doc): SheetSection | null {
   const rows = roomRows(doc);
   if (rows.length === 0) return null;
   const t = table(
@@ -115,7 +123,7 @@ function roomsSection(doc: Doc): SheetSection | null {
 }
 
 /** Ce qu'il y a derrière chaque disjoncteur : appareils, longueur de câble et pièces desservies. */
-function circuitsSection(doc: Doc): SheetSection | null {
+export function circuitsSection(doc: Doc): SheetSection | null {
   if (doc.boards.length === 0) return null;
   const links = allLinks(doc);
   const rows = circuitOptions(doc)
@@ -136,7 +144,7 @@ function circuitsSection(doc: Doc): SheetSection | null {
   return { key: 'circuits', title: 'Circuits raccordés au plan', svg: t.svg, width: 1200, height: t.height };
 }
 
-function materialsSection(doc: Doc): SheetSection | null {
+export function materialsSection(doc: Doc): SheetSection | null {
   const rows = planBomRows(doc);
   if (rows.length === 0) return null;
   const t = table(
@@ -160,7 +168,7 @@ const WALLS_GAP = 24;
  * Élévations des murs équipés : position et hauteur de chaque prise, interrupteur, etc.
  * Les élévations sont rangées côte à côte tant qu'elles tiennent dans la largeur de la fiche.
  */
-function wallsSection(doc: Doc): SheetSection | null {
+export function wallsSection(doc: Doc): SheetSection | null {
   const circuits = circuitInfo(doc);
   const rooms = roomsOf(doc.items).sort((a, b) => a.y - b.y || a.x - b.x);
   const cells: { svg: string; width: number; height: number }[] = [];
@@ -207,7 +215,7 @@ interface PointRow {
  * Liste des points, pièce par pièce : chaque appareil avec son mur, sa distance au coin gauche, sa
  * hauteur et son circuit. C'est le « cahier des points » que l'on remet à l'électricien.
  */
-function pointsSection(doc: Doc): SheetSection | null {
+export function pointsSection(doc: Doc): SheetSection | null {
   const bySymbols = symbolsByRoom(doc);
   const circuits = new Map(circuitOptions(doc).map((o) => [o.id, `${o.ref} · ${o.label}`] as const));
   const rows: PointRow[] = [];
@@ -253,7 +261,7 @@ function pointsSection(doc: Doc): SheetSection | null {
 }
 
 /** Câble à prévoir : tracés dessinés et estimation par circuit (tableau -> appareils, descentes comprises). */
-function cablesSection(doc: Doc): SheetSection | null {
+export function cablesSection(doc: Doc): SheetSection | null {
   interface Row {
     name: string;
     length: string;

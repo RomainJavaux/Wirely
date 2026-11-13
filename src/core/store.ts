@@ -32,8 +32,14 @@ export interface WallFaceRef {
   key: string;
 }
 
-/** Mode d'édition : plan de la maison (avec ses murs), tableau électrique, vue 3D ou dossier à remettre. */
-export type Mode = 'plan' | 'board' | 'view3d' | 'dossier';
+/**
+ * Espace affiché, dans l'ordre du travail : le chantier (accueil), les pièces et leurs points, le
+ * tableau, le plan (et sa vue 3D), le dossier à remettre.
+ */
+export type Mode = 'home' | 'rooms' | 'board' | 'plan' | 'view3d' | 'dossier';
+
+/** Vue du tableau : liste des circuits (saisie rapide), face avant (rails) ou schéma unifilaire. */
+export type BoardView = 'circuits' | 'front' | 'uni';
 
 /** Ce que le plan affiche (n'affecte pas le document ni les exports). */
 export interface ViewOptions {
@@ -58,6 +64,9 @@ export interface AppState {
   view: ViewOptions;
   /** Tableau en cours d'édition. */
   boardId: number | null;
+  boardView: BoardView;
+  /** Pièce ouverte dans l'espace « Pièces ». */
+  roomId: number | null;
   /** Appareil sélectionné dans le tableau. */
   deviceSelection: number | null;
   /** Appareil choisi dans la palette, prêt à être posé sur un rail. */
@@ -108,9 +117,11 @@ export class Store {
       tool: 'select',
       symbolKind: null,
       wireType: 'prises',
-      mode: 'plan',
+      mode: 'home',
       view: { ...DEFAULT_VIEW },
       boardId: doc.boards[0]?.id ?? null,
+      boardView: 'circuits',
+      roomId: null,
       deviceSelection: null,
       armedKind: null,
       mergeFrom: null,
@@ -222,6 +233,7 @@ export class Store {
     this.state.activeCircuit = null;
     this.state.boardFilter = '';
     this.state.wallFace = null;
+    this.state.roomId = null;
     this.state.boardId = doc.boards[0]?.id ?? null;
     this.history = [JSON.stringify(doc)];
     this.cursor = 0;
@@ -242,6 +254,7 @@ export class Store {
     this.state.doc = JSON.parse(this.history[index] as string) as Doc;
     if (this.getItem(this.state.selection) === undefined) this.state.selection = null;
     if (this.getItem(this.state.mergeFrom) === undefined) this.state.mergeFrom = null;
+    if (this.getItem(this.state.roomId) === undefined) this.state.roomId = null;
     this.fixBoardSelection();
     if (locateDevice(this.state.doc, this.state.activeCircuit) === null) this.state.activeCircuit = null;
     this.revision++;

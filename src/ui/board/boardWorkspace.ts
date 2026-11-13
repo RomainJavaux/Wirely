@@ -12,7 +12,7 @@ import {
 } from '../../core/boardActions';
 import type { Store } from '../../core/store';
 import { getDeviceDef } from '../../domain/board/catalog';
-import { MAX_COLS, MIN_COLS, canPlace, createDevice, deviceWidth, lastUsedRow, minCols } from '../../domain/board/layout';
+import { MAX_COLS, MAX_ROWS, MIN_COLS, canPlace, createDevice, deviceWidth, lastUsedRow, minCols } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
 import { linkSymbolToBoard, showItemOnPlan } from '../../core/links';
 import { generateBoard, notify } from '../../core/planActions';
@@ -20,7 +20,7 @@ import { linkBadges, matchingDevices, symbolOfBoard, tableauSymbols } from '../.
 import { roomAt, roomsOf } from '../../domain/plan/metrics';
 import { getRoomKind } from '../../domain/plan/roomKinds';
 import { boardWidth, deviceBox, renderBoard, slotFromPoint, type Ghost } from '../../render/board/boardSvg';
-import { renderUnifilaire } from '../../render/board/unifilaire';
+import { refSchemeOf } from '../../domain/rules';
 import { esc } from '../../util/escape';
 import { isTyping, qs } from '../dom';
 import { DevicePalette } from './devicePalette';
@@ -43,7 +43,9 @@ export class BoardWorkspace {
   private zoom = 1;
   private needFit = true;
   private lastBoardId: number | null = null;
-  private view: 'front' | 'uni' = 'front';
+  /** L'éditeur de rails ne montre que la face avant ; l'unifilaire a sa propre vue. */
+  private readonly view = 'front' as const;
+  private wasShown = false;
   private ghost: Ghost | null = null;
   private dragId: number | null = null;
   private gesture: Gesture | null = null;
@@ -148,21 +150,12 @@ export class BoardWorkspace {
       if (symbol) showItemOnPlan(store, symbol.id);
     };
 
-    qs<HTMLButtonElement>('#bViewFront').onclick = () => this.setView('front');
-    qs<HTMLButtonElement>('#bViewUni').onclick = () => this.setView('uni');
     qs<HTMLButtonElement>('#bZoomIn').onclick = () => this.setZoom(this.zoom * 1.2);
     qs<HTMLButtonElement>('#bZoomOut').onclick = () => this.setZoom(this.zoom / 1.2);
     qs<HTMLButtonElement>('#bFit').onclick = () => {
       this.needFit = true;
       this.render();
     };
-  }
-
-  private setView(view: 'front' | 'uni'): void {
-    this.view = view;
-    this.needFit = true;
-    this.ghost = null;
-    this.render();
   }
 
   private setZoom(z: number): void {
@@ -295,7 +288,7 @@ export class BoardWorkspace {
   private bindKeyboard(): void {
     const { store } = this;
     window.addEventListener('keydown', (e) => {
-      if (store.state.mode !== 'board' || isTyping()) return;
+      if (store.state.mode !== 'board' || store.state.boardView !== 'front' || isTyping()) return;
       const mod = e.ctrlKey || e.metaKey;
       const id = store.state.deviceSelection;
       const device = store.activeBoard?.devices.find((d) => d.id === id);
@@ -336,7 +329,11 @@ export class BoardWorkspace {
 
   private render(): void {
     const { store } = this;
-    if (store.state.mode !== 'board') return;
+    const shown = store.state.mode === 'board' && store.state.boardView === 'front';
+    // À l'ouverture de la vue, le tableau est recadré (sa taille n'était pas mesurable avant).
+    if (shown && !this.wasShown) this.needFit = true;
+    this.wasShown = shown;
+    if (!shown) return;
     const board = store.activeBoard;
     const boards = store.state.doc.boards;
 
@@ -352,39 +349,27 @@ export class BoardWorkspace {
       this.customCols = false;
     }
     // Une demande de « voir cet appareil » : la face avant seule permet de le montrer.
-    const focus = store.state.boardFocus;
-    if (focus && focus.seq !== this.lastFocusSeq && this.view === 'uni') this.view = 'front';
-
     this.syncToolbar(board);
 
-    if (this.view === 'front') {
-      this.natural = { w: boardWidth(board), h: 0 };
-      this.applyFit();
-      const r = renderBoard(board, {
-        interactive: true,
-        selectedId: store.state.deviceSelection,
-        ghost: this.ghost,
-        dragId: this.dragId,
-        badges: linkBadges(store.state.doc),
-        highlight: matchingDevices(store.state.doc, board, store.state.boardFilter),
-      });
-      this.natural = { w: r.width, h: r.height };
-      this.host.innerHTML = this.wrap(r.svg, r.width, r.height);
-      this.applyFocusRequest(board);
-    } else {
-      const r = renderUnifilaire(board);
-      this.natural = { w: r.width, h: r.height };
-      this.applyFit();
-      this.host.innerHTML = this.wrap(r.svg, r.width, r.height);
-    }
+    this.natural = { w: boardWidth(board), h: 0 };
+    this.applyFit();
+    const r = renderBoard(board, {
+      interactive: true,
+      selectedId: store.state.deviceSelection,
+      ghost: this.ghost,
+      dragId: this.dragId,
+      badges: linkBadges(store.state.doc),
+      highlight: matchingDevices(store.state.doc, board, store.state.boardFilter),
+      scheme: refSchemeOf(store.state.doc),
+    });
+    this.natural = { w: r.width, h: r.height };
+    this.host.innerHTML = this.wrap(r.svg, r.width, r.height);
+    this.applyFocusRequest(board);
 
     const armed = store.state.armedKind ? getDeviceDef(store.state.armedKind) : undefined;
-    qs('#boardHint').textContent =
-      this.view === 'uni'
-        ? 'Schéma unifilaire généré automatiquement depuis l’implantation. Repassez en « Face avant » pour modifier.'
-        : armed
-          ? `Cliquez sur un rail pour poser « ${armed.name} » (Échap pour annuler).`
-          : 'Glissez un appareil depuis la palette sur un rail · cliquez-en un pour le régler · ← → pour le décaler.';
+    qs('#boardHint').textContent = armed
+      ? `Cliquez sur un rail pour poser « ${armed.name} » (Échap pour annuler).`
+      : 'Glissez un appareil depuis la palette sur un rail · cliquez-en un pour le régler · ← → pour le décaler.';
   }
 
   /** Fait défiler la face avant jusqu'à l'appareil demandé (« voir au tableau », liste des circuits). */
@@ -469,8 +454,6 @@ export class BoardWorkspace {
 
     qs('#bRows').textContent = String(board.rows);
     qs<HTMLButtonElement>('#bRowMinus').disabled = board.rows <= Math.max(1, lastUsedRow(board) + 1);
-    qs<HTMLButtonElement>('#bRowPlus').disabled = board.rows >= 8;
-    qs('#bViewFront').classList.toggle('active', this.view === 'front');
-    qs('#bViewUni').classList.toggle('active', this.view === 'uni');
+    qs<HTMLButtonElement>('#bRowPlus').disabled = board.rows >= MAX_ROWS;
   }
 }

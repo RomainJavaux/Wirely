@@ -27,6 +27,10 @@ export interface RenderOptions {
   circuits?: ReadonlyMap<number, { ref: string; color: string }>;
   /** Circuit actif : ses éléments ressortent, les autres sont atténués. */
   activeCircuit?: number | null;
+  /** Repère de chaque point (« A3 ») : affiché à la place du seul repère du circuit. */
+  refs?: ReadonlyMap<number, string>;
+  /** Signale les positions et les dimensions « à vérifier » (éditeur seulement). */
+  showRough?: boolean;
 }
 
 const points = (pts: readonly (readonly number[])[]): string => pts.map((p) => p.join(',')).join(' ');
@@ -60,16 +64,41 @@ function pill(x: number, y: number, text: string, opts: { size?: number; fill?: 
   );
 }
 
-function renderRoom(it: Room, o: RenderOptions, selected: boolean): string {
+/**
+ * Haut du bloc « nom + dimensions » d'une pièce : la première place, du haut vers le bas puis du
+ * centre vers les côtés, qui ne recouvre ni un symbole ni son repère. Aucune place libre : null.
+ */
+function labelSpot(
+  main: { x: number; y: number; w: number; h: number },
+  w: number,
+  h: number,
+  obstacles: readonly SymbolItem[],
+): { cx: number; top: number } | null {
+  const half = Math.min(w, main.w - 8) / 2;
+  const centers = [0.5, 0.28, 0.72].map((f) => Math.min(main.x + main.w - half - 4, Math.max(main.x + half + 4, main.x + main.w * f)));
+  for (let top = main.y + 8; top + h <= main.y + main.h - 4; top += 6) {
+    for (const cx of centers) {
+      const hits = (x0: number, y0: number, x1: number, y1: number): boolean => cx - half < x1 && cx + half > x0 && top < y1 && top + h > y0;
+      // Chaque symbole occupe son rond, et son repère en haut à droite.
+      const free = obstacles.every((s) => !hits(s.x - 14, s.y - 14, s.x + 14, s.y + 14) && !hits(s.x + 6, s.y - 24, s.x + 28, s.y - 10));
+      if (free) return { cx, top };
+    }
+  }
+  return null;
+}
+
+function renderRoom(it: Room, o: RenderOptions, selected: boolean, obstacles: readonly SymbolItem[] = []): string {
   const kind = getRoomKind(it.kind);
   const attr = o.interactive ? ` data-id="${it.id}"` : '';
   const rects = roomRects(it);
   const stroke = selected ? ACCENT : '#aab3c2';
   const sw = selected ? 2.5 : 1;
+  // Pièce créée depuis la liste : ses dimensions restent à préciser.
+  const dash = o.showRough && it.rough ? ' stroke-dasharray="7 5"' : '';
   let out = `<g${attr}>`;
 
   if (rects.length === 1) {
-    out += `<rect x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" fill="${kind.color}" stroke="${stroke}" stroke-width="${sw}"/>`;
+    out += `<rect x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" fill="${kind.color}" stroke="${stroke}" stroke-width="${sw}"${dash}/>`;
   } else {
     // Pièce composée : les parties sont remplies sans bordure, puis le contour de l'union est tracé :
     // les arêtes communes entre deux parties disparaissent.
@@ -83,11 +112,22 @@ function renderRoom(it: Room, o: RenderOptions, selected: boolean): string {
   // Nom et surface : dans le plus grand rectangle de la pièce.
   const main = largestRect(rects);
   const name = it.label.trim() || (it.kind === 'autre' ? '' : kind.name);
-  const cx = main.x + main.w / 2;
-  if (name) {
-    out += `<text x="${cx}" y="${main.y + 20}" font-size="13" font-weight="700" text-anchor="middle" font-family="${FONT}" fill="#374151">${esc(name)}</text>`;
+  let withDims = o.scale !== undefined && main.w >= 80 && main.h >= 60;
+  const lines = (name ? 1 : 0) + (withDims ? 1 : 0);
+  if (lines === 0) return out + '</g>';
+  const near = obstacles.filter((s) => s.x > main.x - 30 && s.x < main.x + main.w + 30 && s.y > main.y - 30 && s.y < main.y + main.h + 30);
+  const nameW = name.length * 7.6;
+  let spot = labelSpot(main, Math.max(nameW, withDims ? 112 : 0), lines * 15, near);
+  if (!spot && name && withDims) {
+    // Pièce chargée de points : le nom seul, là où il reste de la place.
+    spot = labelSpot(main, nameW, 15, near);
+    if (spot) withDims = false;
   }
-  if (o.scale !== undefined && main.w >= 80 && main.h >= 60) {
+  const { cx, top } = spot ?? { cx: main.x + main.w / 2, top: main.y + 8 };
+  if (name) {
+    out += `<text x="${cx}" y="${top + 12}" font-size="13" font-weight="700" text-anchor="middle" font-family="${FONT}" fill="#374151">${esc(name)}</text>`;
+  }
+  if (withDims && o.scale !== undefined) {
     let text: string;
     if (rects.length === 1) {
       const w = toMeters(o.scale, it.w);
@@ -97,7 +137,7 @@ function renderRoom(it: Room, o: RenderOptions, selected: boolean): string {
       const m2 = toSquareMeters(o.scale, roomArea(it));
       text = `${fmtArea(m2)} · ${rects.length} parties`;
     }
-    out += `<text x="${cx}" y="${main.y + (name ? 35 : 20)}" font-size="10" text-anchor="middle" font-family="${FONT}" fill="#6b7385">${esc(text)}</text>`;
+    out += `<text x="${cx}" y="${top + (name ? 27 : 12)}" font-size="10" text-anchor="middle" font-family="${FONT}" fill="#6b7385">${esc(text)}</text>`;
   }
   return out + '</g>';
 }
@@ -189,9 +229,14 @@ function renderSymbol(it: SymbolItem, o: RenderOptions, selected: boolean): stri
     `<g stroke="${stroke}" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round">${def.svg}</g></g>`;
 
   if (hot) out += `<circle cx="${it.x}" cy="${it.y}" r="19" fill="${info?.color ?? ACCENT}" fill-opacity=".14" stroke="${info?.color ?? ACCENT}" stroke-width="2"/>`;
+  // Position posée automatiquement, pas encore vérifiée.
+  if (o.showRough && it.rough && !selected) {
+    out += `<circle cx="${it.x}" cy="${it.y}" r="16" fill="none" stroke="#d97706" stroke-width="1.3" stroke-dasharray="3 3"/>`;
+  }
   if (selected) out += `<circle cx="${it.x}" cy="${it.y}" r="20" fill="none" stroke="${ACCENT}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
   if (it.label.trim()) out += pill(it.x, it.y + 31, it.label.trim(), { size: 9.5 });
-  if (info) out += pill(it.x + 17, it.y - 15, info.ref, { size: 8.5, fill: info.color, color: '#fff' });
+  const ref = o.refs?.get(it.id) ?? info?.ref;
+  if (ref) out += pill(it.x + 17, it.y - 15, ref, { size: 8.5, fill: info?.color ?? '#6b7385', color: '#fff' });
   if (o.interactive) out += `<rect x="${it.x - 17}" y="${it.y - 17}" width="34" height="34" fill="transparent"/>`;
   return out + '</g>';
 }
@@ -226,7 +271,9 @@ export function renderScene(doc: Pick<Doc, 'items'>, opts: RenderOptions): strin
   const sel = (type: Item['type']) => items.filter((i) => i.type === type);
 
   let out = '';
-  for (const r of sel('room')) out += renderItem(r, opts);
+  // Les noms de pièces évitent les symboles affichés (sauf les ouvertures, qui restent dans le mur).
+  const obstacles = hide.symbols ? [] : (sel('symbol') as SymbolItem[]).filter((s) => !getSymbol(s.kind)?.gap);
+  for (const r of sel('room') as Room[]) out += renderRoom(r, opts, opts.interactive && r.id === opts.selectedId, obstacles);
 
   // Murs en deux passes : tous les traits sombres, puis tous les cœurs clairs.
   const walls = sel('wall') as Wall[];

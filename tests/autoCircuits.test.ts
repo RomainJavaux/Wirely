@@ -51,10 +51,11 @@ describe('France : circuits déduits des points', () => {
     const plans = planCircuits(docOf(flat()));
     const byLabel = new Map(plans.map((p) => [p.label, p]));
 
-    // Éclairage : 3 points, un seul circuit 10 A qui porte aussi les commandes.
-    const light = byLabel.get('Éclairage')!;
-    expect(light).toMatchObject({ usage: 'eclairage', rating: 10, section: 1.5, group: 'eclairage' });
-    expect(light.itemIds.sort()).toEqual([10, 11, 20, 21, 30, 31]);
+    // Éclairage : trois locaux éclairés, donc deux circuits 10 A (jour et nuit), commandes comprises.
+    const day = byLabel.get('Éclairage jour')!;
+    expect(day).toMatchObject({ usage: 'eclairage', rating: 10, section: 1.5, group: 'eclairage' });
+    expect(day.itemIds.sort()).toEqual([10, 11, 20, 21]);
+    expect(byLabel.get('Éclairage nuit')!.itemIds.sort()).toEqual([30, 31]);
 
     // Prises : la cuisine a son propre circuit, en 20 A / 2,5 mm².
     const kitchen = plans.find((p) => p.usage === 'prises' && p.rooms[0] === 'Cuisine')!;
@@ -266,7 +267,7 @@ describe('estimation du câble', () => {
       doc.items = doc.items.map((i) => (i.type === 'symbol' && plan.itemIds.includes(i.id) ? { ...i, breaker: device.id } : i));
     }
     doc.boards = [gen.board];
-    const first = gen.circuits.find((c) => c.plan.label === 'Éclairage')!;
+    const first = gen.circuits.find((c) => c.plan.label === 'Éclairage jour')!;
     return { doc, deviceId: first.device.id };
   }
 
@@ -274,7 +275,7 @@ describe('estimation du câble', () => {
     const { doc, deviceId } = withBoard();
     const device = doc.boards[0]!.devices.find((d) => d.id === deviceId)!;
     const route = estimateRoute(doc, device)!;
-    expect(route.count).toBe(6);
+    expect(route.count).toBe(4);
     expect(route.points[0]).toEqual([100, 315]); // le tableau
     expect(route.length).toBeGreaterThan(10);
     expect(route.length).toBeLessThan(60);

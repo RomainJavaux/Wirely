@@ -8,8 +8,16 @@ import type { ToolManager } from '../tools/toolManager';
 import { snap } from '../domain/geometry';
 import { openBoard } from '../core/links';
 import { circuitInfo, itemsOfCircuit } from '../domain/link/links';
+import { pointRefs } from '../domain/points';
 import { unionBounds } from '../domain/geometry';
 import { renderScene } from './items';
+
+/** Geste à deux doigts : écart et milieu des doigts au dernier mouvement. */
+interface PinchState {
+  dist: number;
+  cx: number;
+  cy: number;
+}
 
 interface PanState {
   clientX: number;
@@ -25,6 +33,13 @@ interface PanState {
 export class CanvasView {
   private pan: PanState | null = null;
   private spacePan = false;
+  /** Doigts posés sur le plan (écran tactile). */
+  private readonly touches = new Map<number, { x: number; y: number }>();
+  private pinch: PinchState | null = null;
+  /** Après un zoom à deux doigts, les doigts encore posés ne pilotent plus l'outil. */
+  private afterPinch = false;
+  /** Révision du document quand le premier doigt s'est posé. */
+  private touchRevision = 0;
   private readonly world: SVGGElement;
 
   constructor(
@@ -40,6 +55,7 @@ export class CanvasView {
     svg.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     svg.addEventListener('pointermove', (e) => this.onPointerMove(e));
     svg.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    svg.addEventListener('pointercancel', (e) => this.releaseTouch(e));
     svg.addEventListener('pointerleave', () => this.tools.active.pointerLeave());
     svg.addEventListener('dblclick', (e) => {
       this.tools.active.finish();
@@ -79,6 +95,8 @@ export class CanvasView {
       interactive: true,
       selectedId: selection,
       circuits: circuitInfo(doc),
+      refs: pointRefs(doc),
+      showRough: true,
       activeCircuit,
       scale: view.dims ? doc.scale : undefined,
       hide: { wires: !view.wires, symbols: !view.symbols, texts: !view.texts },
@@ -157,12 +175,65 @@ export class CanvasView {
     return best ?? fallback;
   }
 
+  private pinchState(): PinchState | null {
+    const [a, b] = [...this.touches.values()];
+    if (!a || !b) return null;
+    return { dist: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+  }
+
+  /**
+   * Suit les doigts posés sur un écran tactile. Deux doigts zooment et déplacent la vue ; rend
+   * vrai quand l'événement appartient à ce geste et ne doit pas atteindre l'outil.
+   */
+  private trackTouch(e: PointerEvent, phase: 'down' | 'move'): boolean {
+    if (e.pointerType !== 'touch') return false;
+    if (phase === 'move' && !this.touches.has(e.pointerId)) return this.afterPinch;
+    this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (phase === 'down') {
+      if (this.touches.size === 1) {
+        this.touchRevision = this.store.revision;
+        return false;
+      }
+      if (this.touches.size === 2 && !this.afterPinch) {
+        // Le premier doigt avait commencé autre chose : on l'abandonne (et on retire ce qu'il a posé).
+        this.pan = null;
+        const { tool } = this.store.state;
+        if (tool !== 'wall' && tool !== 'wire') this.tools.active.cancel();
+        if (this.store.revision !== this.touchRevision && this.store.canUndo) this.store.undo();
+        this.afterPinch = true;
+      }
+      this.pinch = this.touches.size === 2 ? this.pinchState() : null;
+      return true;
+    }
+
+    if (!this.afterPinch) return false;
+    const next = this.touches.size === 2 ? this.pinchState() : null;
+    if (next && this.pinch) {
+      const rect = this.svg.getBoundingClientRect();
+      this.viewport.pinch(next.cx - rect.left, next.cy - rect.top, next.dist / this.pinch.dist, next.cx - this.pinch.cx, next.cy - this.pinch.cy);
+    }
+    this.pinch = next;
+    return true;
+  }
+
+  /** Un doigt se lève : rend vrai si son geste était un zoom (l'outil n'en saura rien). */
+  private releaseTouch(e: PointerEvent): boolean {
+    if (e.pointerType !== 'touch') return false;
+    this.touches.delete(e.pointerId);
+    this.pinch = null;
+    if (!this.afterPinch) return false;
+    if (this.touches.size === 0) this.afterPinch = false;
+    return true;
+  }
+
   private onPointerDown(e: PointerEvent): void {
     if (e.button === 2) {
       this.tools.active.finish();
       return;
     }
     this.svg.setPointerCapture(e.pointerId);
+    if (this.trackTouch(e, 'down')) return;
     if (e.button === 1 || this.spacePan) {
       this.beginPan(e);
       return;
@@ -171,6 +242,7 @@ export class CanvasView {
   }
 
   private onPointerMove(e: PointerEvent): void {
+    if (this.trackTouch(e, 'move')) return;
     if (this.pan) {
       this.viewport.panTo(
         this.pan.originX + e.clientX - this.pan.clientX,
@@ -182,6 +254,7 @@ export class CanvasView {
   }
 
   private onPointerUp(e: PointerEvent): void {
+    if (this.releaseTouch(e)) return;
     if (this.pan) {
       this.pan = null;
       return;

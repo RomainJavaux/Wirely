@@ -2,6 +2,7 @@ import { addItem, setCeiling } from '../../core/actions';
 import type { Store } from '../../core/store';
 import { getSymbol } from '../../domain/catalog';
 import { circuitInfo } from '../../domain/link/links';
+import { settle } from '../../domain/plan/arrange';
 import { roomsOf } from '../../domain/plan/metrics';
 import { getRoomKind } from '../../domain/plan/roomKinds';
 import type { Room, SymbolItem } from '../../domain/types';
@@ -277,7 +278,7 @@ export class WallDrawer {
       height = clamp(snap(p.v), 0, doc.ceiling);
     }
     const [x, y] = moveAlongFace(doc, cur.face, item, u);
-    store.updateItem({ ...item, x, y, height });
+    store.updateItem(settle({ ...item, x, y, height }));
   }
 
   /** Pose un nouvel appareil sur le mur affiché, au point cliqué. */
@@ -344,7 +345,7 @@ export class WallDrawer {
     const [x, y] = moveAlongFace(doc, cur.face, item, placed.u + du);
     const fixed = item.kind === 'porte' || isCeilingKind(item.kind);
     const height = fixed ? item.height : clamp(effectiveHeight(item) + dv, 0, doc.ceiling);
-    store.updateItem({ ...item, x, y, height });
+    store.updateItem(settle({ ...item, x, y, height }));
     store.commit();
   }
 

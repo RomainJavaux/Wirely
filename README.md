@@ -1,62 +1,71 @@
 # Wirely
 
-Éditeur de plans électriques (maison, pièce…) et configurateur de tableau électrique,
-avec export PNG / SVG / PDF. Vite + TypeScript, sans framework.
+Le carnet de chantier de l'électricien : on **compte les points** pièce par pièce, on les répartit
+sur les **circuits**, et l'outil en tire le **schéma unifilaire**, le **schéma de position** et le
+reste du dossier. Belgique (RGIE) ou France (NF C 15-100), au choix par chantier.
+Vite + TypeScript, sans framework. La réflexion de conception est dans `docs/conception.md`.
 
 ## À quoi ça sert
 
-Wirely part des **pièces** et en déduit le reste : l'équipement conseillé, les circuits, le tableau,
-le métré, puis le dossier à remettre. On ne dessine pas des symboles un à un : on décrit, on
-ajuste, on exporte.
+Trois travaux d'électricien ont guidé la conception :
 
-### Quatre usages qui guident la conception
+1. **Relever l'existant** (sur place, téléphone ou tablette). Devant le tableau, on note les
+   différentiels et les circuits (au pouce, ou en **saisie rapide** : « ID 40 A type A »,
+   « 20 Lave-linge @ Cuisine »). On active un circuit, on passe dans la pièce et on compte ce
+   qu'il alimente avec de gros boutons + / −.
+2. **Étudier et chiffrer** (au bureau). On liste les pièces, on compte les points voulus,
+   « Raccorder » propose les circuits selon les règles du pays, et l'**estimation au point** donne
+   un ordre de prix avec ses propres tarifs.
+3. **Préparer le contrôle**. Les deux schémas exigés sortent des mêmes données, avec les mêmes
+   repères (A1, A2… en Belgique), un cartouche (adresse, client, installateur, date) et les cases de
+   signature. Une **liste de contrôle** dit ce qui manque et y conduit.
 
-1. **Préparer une rénovation ou une construction** (particulier, petit pro). On décrit les pièces
-   (type et dimensions), « Équiper les pièces » propose prises, lumières et commandes conformes aux
-   repères de la norme, on ajuste (positions et hauteurs sur chaque mur), « Générer le tableau »
-   regroupe les circuits, puis le **Dossier** donne le plan, la liste des points par pièce, les
-   murs cotés, les circuits et le matériel.
-2. **Documenter un tableau existant** (électricien devant le tableau). Pas besoin du plan :
-   **saisie rapide au clavier** (« ID 40 A type A », « 20 Lave-linge @ Cuisine »…), tableau et
-   étiquettes prêts en une minute, avec les pièces desservies.
-3. **Ajouter ou déplacer un point** dans une installation existante : un nouvel appareil se
-   raccorde de lui-même au circuit qui dessert déjà la pièce (s'il a de la place), « Raccorder
-   automatiquement » règle le reste, et chaque circuit montre ce qu'il alimente.
-4. **Remettre le dossier** : un aperçu exact du document exporté (PDF, PNG, SVG, CSV), la liste des
-   points à régler avant de le remettre, et un lien partageable.
+### Les principes
 
-### Les quatre onglets
+- **Compter d'abord, dessiner ensuite.** Un point compté est posé de lui-même sur un mur de sa
+  pièce, marqué « position à vérifier ». Le plan sert à ajuster, pas à saisir.
+- **Une saisie, deux schémas.** Unifilaire et schéma de position ne peuvent pas se contredire : ils
+  lisent les mêmes points et les mêmes circuits.
+- **Le circuit en main.** Le circuit actif (sa lettre, sa couleur) reste visible partout ; ce que
+  l'on compte ou pose s'y raccorde.
+- **Rien n'est ressaisi.** Adresse, client et installateur sont saisis une fois ; le pays règle le
+  vocabulaire, les repères, les sections et les limites.
+- **Tout s'annule**, et l'application rouvre l'espace où l'on s'était arrêté.
 
-- **Plan** — le poste de travail. Pièces (typées, à l'échelle, fusionnables en L ou en U), portes
-  et fenêtres, appareillage. Un panneau **Projet** dit où on en est et propose l'étape suivante.
-  Un appareil posé **s'accroche au mur** le plus proche (orienté vers la pièce, à sa hauteur
-  usuelle, avec un aperçu : mur, distance au coin, hauteur). Le **tiroir des murs** (bouton
-  « Murs ») montre le mur de la pièce sélectionnée de face, à l'échelle : on y glisse les appareils
-  (pas de 5 cm), ou on saisit la distance au coin et la hauteur dans le panneau de droite.
-  Le câblage à la main reste possible (« Câblage manuel ») mais n'est plus nécessaire.
-- **Tableau** — rails DIN, appareils modulaires, Niko (Nikobus, Home Control II). Face avant
-  étiquetée, unifilaire, repérage, nomenclature. Se génère depuis le plan, se saisit au clavier ou se
-  construit à la souris. Onglet **Circuits** pour les gros tableaux (recherche, groupes par
-  différentiel, accès au plan).
-- **3D** — la maison en volume (Three.js, chargé à la demande) : murs percés, appareillage à sa
-  vraie hauteur, circuit en évidence, coupe réglable.
-- **Dossier** — ce que l'on remet : sections au choix, points à régler, exports.
+### Les cinq espaces
 
-### Ce que l'outil déduit (et ce qu'il ne fait pas)
+Barre latérale sur ordinateur, barre du bas sur téléphone.
 
-Tous les minimums et regroupements sont des **repères indicatifs** inspirés de la NF C 15-100 ; ils
-ne remplacent ni la norme ni un professionnel.
+- **Chantier** — pays, avancement (points, circuits, plan, dossier), prochaine étape,
+  renseignements du chantier, liste de contrôle.
+- **Pièces** — la liste des pièces et, pour chacune, les compteurs de points (prises, points
+  lumineux, commandes, appareils fixes), le circuit de chaque point.
+- **Tableau** — trois vues du même tableau : **Circuits** (différentiels, calibre, section, câble,
+  jauge de charge), **Face avant** (rails DIN, appareils modulaires, Niko) et **Unifilaire**.
+- **Plan** — les pièces à l'échelle. Déplacer une pièce emporte ses points ; la redimensionner les
+  garde sur leurs murs ; un point glissé s'accroche au mur. Tiroir des **murs** (élévation, hauteur
+  de pose), vue **3D** (Three.js, chargé à la demande), zoom à deux doigts sur écran tactile.
+- **Dossier** — les documents à remettre : schéma unifilaire, schéma de position, repérage des
+  circuits, étiquettes du tableau à l'échelle 1, liste des points, face avant, élévations des murs,
+  estimation au point, matériel et câbles. Aperçu exact, impression (PDF par le navigateur), PNG,
+  SVG, CSV.
 
-- **Équipement conseillé** par type de pièce et par surface (prises, points lumineux, commandes,
-  RJ45, circuits spécialisés en cuisine, plan de travail à 110 cm, détecteur de fumée).
-- **Circuits** : éclairage (≤ 8 points, jour/nuit au-delà), prises par zone (≤ 5 prises en 16 A,
-  ≤ 8 en 20 A), un circuit par appareil spécialisé (plaque 32 A, lave-linge…), chauffage, chauffe-eau,
-  VMC, volets. **Différentiels** : un rail type A pour les spécialisés, l'éclairage séparé des prises
-  dans un grand logement, 8 circuits au plus par différentiel, 20 % de réserve.
-- **Câble** : estimation par circuit (tableau → appareils, descentes depuis le plafond, marge de
-  pose), regroupée par section dans le dossier. Un tracé dessiné à la main a priorité.
-- Pas de calcul de puissance, de chute de tension ni de sélectivité : c'est un outil de
-  documentation et de préparation, pas un logiciel de calcul.
+### Les règles du pays (et ce que l'outil ne fait pas)
+
+Ce sont des **repères indicatifs** ; ils ne remplacent ni le règlement, ni l'organisme de contrôle,
+ni le jugement du professionnel.
+
+- **Belgique · RGIE** — 8 points au plus par circuit qui comporte des prises (une prise multiple
+  compte pour une), 2,5 mm² dès qu'il y a une prise, 1,5 mm² → 16 A et 2,5 mm² → 20 A, au moins deux
+  circuits d'éclairage, différentiel général 300 mA de type A, 30 mA pour la salle de bains, le
+  lave-linge, le sèche-linge et le lave-vaisselle, disjoncteurs bipolaires, circuits repérés par
+  des lettres, schémas datés et signés en trois exemplaires.
+- **France · NF C 15-100** — 8 prises en 1,5 mm² / 16 A, 12 en 2,5 mm² / 20 A, 8 points lumineux par
+  circuit, différentiels 30 mA (type A pour la plaque et le lave-linge), 8 circuits au plus par
+  différentiel, minimums par pièce, circuits numérotés.
+- **Estimation du câble** par circuit (tableau → points, descentes, marge de pose), par section.
+- Pas de calcul de puissance, de chute de tension ni de sélectivité : c'est un outil de relevé, de
+  préparation et de documentation, pas un logiciel de calcul.
 
 ## Lancer
 
@@ -96,25 +105,31 @@ Les dépendances vont toujours vers le bas : `ui` → `tools`/`render` → `core
 ```
 src/
   domain/    Modèle pur, sans DOM : types, géométrie, catalogue de symboles, validation
-    plan/    Plan : types de pièces, échelle, besoins par pièce, équipement automatique, contrôles, exports CSV
+    rules/   Règles par pays (RGIE, NF C 15-100) et liste de contrôle du chantier
+    plan/    Pièces : types, échelle, besoins, pose automatique d'un point, déplacement avec ses points
     board/   Tableau électrique : appareils, placement sur rails, analyse, contrôles, nomenclature
-    link/    Lien plan <-> tableau : circuits, appareils raccordés, circuits déduits du plan, estimation du câble
+    link/    Lien points <-> circuits : raccordements, circuits déduits des points, estimation du câble
     walls/   Murs : faces d'une pièce, hauteurs de pose, accrochage, position sur un mur, contrôles
     view3d/  Modèle 3D indépendant du moteur : boîtes (murs percés, sols), plaques, câbles
-  core/      Store (état + historique annuler/rétablir), viewport, actions (plan et tableau)
+    points.ts, quote.ts   Points comptés et repères (A1, A2…) ; estimation au point
+  core/      Store (état + historique annuler/rétablir), viewport, actions (points, circuits, plan, tableau)
   render/    Rendu SVG des éléments (partagé éditeur/export) et vue canevas
-    board/   Appareils réalistes, face avant, schéma unifilaire
+    schema/  Schéma unifilaire du chantier (un différentiel par ligne, points repérés)
+    board/   Appareils réalistes, face avant
     walls/   Élévation d'un mur (éditeur et export)
     view3d/  Vue Three.js (chargée à la demande)
   tools/     Un outil par classe (sélection, pièce, mur/câble, symbole, texte)
-  io/        Export (SVG/PNG/PDF/CSV), fiche du tableau, fichiers JSON, sauvegarde automatique
-  ui/        Panneaux : barre du haut, palette, propriétés, raccourcis
-    board/   Espace de travail du tableau : palette d'appareils, glisser-déposer, réglages
+  io/        Documents du dossier, export (SVG/PNG/PDF/CSV), fichiers JSON, sauvegarde automatique
+  ui/        Navigation, en-tête, choix du circuit, propriétés, raccourcis
+    home/    Chantier : avancement, renseignements, liste de contrôle
+    rooms/   Pièces : compteurs de points
+    board/   Tableau : circuits, face avant (palette, glisser-déposer), unifilaire
+    dossier/ Documents à remettre : aperçu, impression, tarifs
     walls/   Tiroir des murs (sous le plan) : élévation éditable, pose rapide
-    view3d/  Espace de travail 3D : coupe, circuit en évidence, détails d'un appareil
-  cloud/     Client d'API, authentification, synchronisation du projet ouvert (URL #/p/<id>)
+    view3d/  Vue 3D : coupe, circuit en évidence, détails d'un appareil
+  cloud/     Client d'API, authentification, synchronisation du chantier ouvert (URL #/p/<id>)
   main.ts    Racine de composition
-tests/       Tests du domaine, du store, de l'export et du client d'API
+tests/       Tests du domaine, du store, des documents et du client d'API
 api/         Point d'entrée de production de l'API (/api/* -> Laravel)
 backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLite en local)
 ```
@@ -129,6 +144,8 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
 - **Rendu partagé** : `render/items.ts` produit le même SVG pour l'éditeur et l'export.
 - **Ajouter un symbole** : une ligne dans `domain/catalog.ts` (pour une porte ou une fenêtre, `gap`
   définit la coupure du mur : le symbole se pose directement sur la ligne du mur).
+- **Ajouter ou corriger une règle** : `domain/rules/index.ts` (une fiche par pays : limites,
+  sections, vocabulaire) ; les contrôles et les circuits proposés la lisent.
 - **Ajouter un type de pièce** : une entrée dans `domain/plan/roomKinds.ts` (couleur, prises
   conseillées en fonction de la surface).
 - **Ajouter un appareil de tableau** : une entrée dans `domain/board/catalog.ts` (largeur par variante, calibres, rôle).
@@ -138,8 +155,10 @@ backend/     API Laravel 13 : comptes (Sanctum), projets, partage (MySQL / SQLit
 
 ## Format de fichier
 
-JSON : `{ name, scale, ceiling, nextId, items: [...], boards: [...] }` (`scale` : mètres par carreau ;
-`ceiling` : hauteur sous plafond en cm, 250 par défaut). Un symbole porte `height` (hauteur de pose en
+JSON : `{ name, scale, ceiling, nextId, project, items: [...], boards: [...] }` (`scale` : mètres par
+carreau ; `ceiling` : hauteur sous plafond en cm, 250 par défaut ; `project` : pays, nature des
+travaux, client, adresse, installateur, date, câble et pose par défaut, tarifs). Une pièce ou un point
+marqué `rough` a été posé automatiquement : sa position reste à vérifier. Un symbole porte `height` (hauteur de pose en
 cm, ou `null` : la hauteur usuelle du type). Les câbles et symboles portent `breaker` (identifiant d'un appareil du tableau, ou `null`) ; un
 symbole « tableau » porte `board`. Les anciens fichiers, où le circuit était un repère saisi à la
 main, sont migrés à l'ouverture sur le premier tableau. Les fichiers sont validés et normalisés à

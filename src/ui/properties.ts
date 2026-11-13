@@ -8,13 +8,17 @@ import {
   showWall,
 } from '../core/links';
 import { equipRoom } from '../core/planActions';
+import { confirmPositions } from '../core/pointActions';
 import type { Store } from '../core/store';
 import { WIRE_TYPES, WIRE_TYPE_IDS, getSymbol } from '../domain/catalog';
 import { suggestCircuit } from '../domain/link/autoCircuits';
 import { circuitLinks, circuitOptions, circuitTitle, isElectrical } from '../domain/link/links';
 import { fmtArea, fmtLength, fmtMeters, polylineLength, roomAt, roomsOf, roomStats, toMeters, wireLengthM } from '../domain/plan/metrics';
 import { metersToRoomUnits } from '../domain/plan/layout';
+import { settle } from '../domain/plan/arrange';
 import { roomNeeds } from '../domain/plan/needs';
+import { allPoints, pointRefs, roomPoints } from '../domain/points';
+import { rulesOf } from '../domain/rules';
 import { ROOM_KINDS, ROOM_KIND_IDS, getRoomKind } from '../domain/plan/roomKinds';
 import type { Item, RoomKind, SymbolItem, WireTypeId } from '../domain/types';
 import {
@@ -30,7 +34,6 @@ import { snapToWall } from '../domain/walls/snap';
 import { esc } from '../util/escape';
 import { bindBreakerField, breakerFieldHtml } from './breakerField';
 import { qs } from './dom';
-import { bindProject, projectHtml } from './projectPanel';
 
 const TITLES: Record<Item['type'], string> = {
   room: 'Pièce',
@@ -82,12 +85,58 @@ export class PropertiesPanel {
 
     const item = this.store.selectedItem;
     if (!item) {
-      this.el.innerHTML = projectHtml(this.store) + SHORTCUTS;
-      bindProject(this.el, this.store);
+      this.el.innerHTML = this.planPanel();
+      const confirm = this.el.querySelector<HTMLButtonElement>('#plConfirm');
+      if (confirm) confirm.onclick = () => confirmPositions(this.store);
+      const rooms = this.el.querySelector<HTMLButtonElement>('#plRooms');
+      if (rooms) rooms.onclick = () => this.store.change((s) => (s.mode = 'rooms'));
       return;
     }
     this.el.innerHTML = this.form(item);
     this.bindForm(item.id);
+  }
+
+  // ---------------------------------------------------------------- rien de sélectionné
+
+  /** Ce qu'il reste à faire sur le plan, et les gestes utiles. */
+  private planPanel(): string {
+    const { doc } = this.store.state;
+    const rules = rulesOf(doc);
+    const points = allPoints(doc);
+    const rough = points.filter((p) => p.rough === true).length;
+    const roughRooms = roomsOf(doc.items).filter((r) => r.rough === true).length;
+
+    if (doc.items.length === 0) {
+      return `<h3>Plan</h3>
+        <p class="muted">Le plan situe chaque point. Les pièces et les points créés dans l’espace « Pièces » y apparaissent d’eux-mêmes.</p>
+        <div class="row"><button type="button" id="plRooms" class="primary">Aller aux pièces</button></div>${SHORTCUTS}`;
+    }
+
+    const scaleNote =
+      rules.country === 'BE'
+        ? 'Le schéma de position n’a pas à être à l’échelle : ce sont les positions relatives qui comptent.'
+        : 'Le plan d’implantation situe chaque point ; les dimensions peuvent rester approximatives.';
+    return `<h3>${esc(rules.docs.position)}</h3>
+      <p class="muted">${scaleNote}</p>
+      ${
+        rough > 0
+          ? `<div class="callout small"><span><b>${rough} position${rough > 1 ? 's' : ''} à vérifier</b>
+               Les points comptés sont posés automatiquement (cercle pointillé). Glissez-les à leur place : ils sont validés.</span>
+               <button type="button" id="plConfirm">Tout valider</button></div>`
+          : points.length > 0
+            ? '<p class="ok">✔ Toutes les positions sont vérifiées.</p>'
+            : ''
+      }
+      ${roughRooms > 0 ? `<p class="muted">${roughRooms} pièce${roughRooms > 1 ? 's ont des dimensions usuelles' : ' a des dimensions usuelles'} (contour pointillé) : déplacez-les, redimensionnez-les par leur coin, ou saisissez leurs dimensions.</p>` : ''}
+      <h3>Gestes</h3>
+      <ul class="tips">
+        <li><b>Glisser une pièce</b> : elle emporte ses points.</li>
+        <li><b>Glisser un point</b> : il s’accroche au mur le plus proche.</li>
+        <li><b>Coin d’une pièce</b> : la redimensionne, les points restent sur leurs murs.</li>
+        <li><b>Murs</b> (en haut à droite) : régler la hauteur de chaque appareil.</li>
+      </ul>
+      <div class="row"><button type="button" id="plRooms">Compter des points</button></div>
+      ${SHORTCUTS}`;
   }
 
   // ---------------------------------------------------------------- formulaire
@@ -210,7 +259,12 @@ export class PropertiesPanel {
   private form(item: Item): string {
     const { doc } = this.store.state;
     const title = item.type === 'symbol' ? (getSymbol(item.kind)?.name ?? 'Symbole') : TITLES[item.type];
-    let h = `<h3>${esc(title)}</h3>`;
+    const ref = item.type === 'symbol' ? pointRefs(doc).get(item.id) : undefined;
+    let h = `<h3>${esc(title)}${ref ? ` <span class="ref-tag">${esc(ref)}</span>` : ''}</h3>`;
+    if (item.type === 'symbol' && item.rough) {
+      h += `<div class="callout small"><span><b>Position à vérifier</b> Glissez ce point à sa place, ou validez-la telle quelle.</span>
+        <button type="button" id="pOk">Valider</button></div>`;
+    }
 
     if (item.type === 'room') {
       const stats = roomStats(doc).find((s) => s.room.id === item.id);
@@ -242,7 +296,9 @@ export class PropertiesPanel {
         <p class="muted">Surface${merged ? ' totale' : ''} : <b>${fmtArea(stats?.area ?? w * d)}</b></p>
         ${partsHtml}
         <div class="row"><button type="button" id="pMerge"${others ? '' : ' disabled'} title="Cliquez ensuite sur la pièce à fusionner dans celle-ci">Fusionner avec une autre pièce…</button></div>`;
-      h += this.needsSection(item.id);
+      const count = roomPoints(doc, item.id).length;
+      h += `<div class="row"><button type="button" id="pCount" class="primary">${count > 0 ? `Voir ses ${count} points` : 'Compter ses points'}</button></div>`;
+      if (rulesOf(doc).country === 'FR') h += this.needsSection(item.id);
     }
 
     if (item.type === 'symbol') {
@@ -324,7 +380,7 @@ export class PropertiesPanel {
       const found = faceOfSymbol(store.state.doc, it);
       if (!found) return;
       const [x, y] = moveAlongFace(store.state.doc, found.face, it, uCm);
-      store.updateItem({ ...it, x, y });
+      store.updateItem(settle({ ...it, x, y }));
       store.commit();
     };
     const u = $<HTMLInputElement>('#pU');
@@ -371,7 +427,7 @@ export class PropertiesPanel {
         const meters = Number(input.value);
         if (!Number.isFinite(meters) || meters <= 0) return;
         const units = metersToRoomUnits(store.state.doc.scale, meters);
-        edit((i) => (i.type === 'room' ? { ...i, [field]: units } : i));
+        edit((i) => (i.type === 'room' ? settle({ ...i, [field]: units }) : i));
         store.commit();
       };
     };
@@ -383,6 +439,18 @@ export class PropertiesPanel {
       if (b) b.onclick = fn;
     };
     on('#pMerge', () => startMerge(store));
+    on('#pOk', () => {
+      const it = symbolNow();
+      if (!it) return;
+      store.updateItem(settle(it));
+      store.commit();
+    });
+    on('#pCount', () =>
+      store.change((s) => {
+        s.mode = 'rooms';
+        s.roomId = id;
+      }),
+    );
     on('#pEquip', () => equipRoom(store, id));
     this.el.querySelectorAll<HTMLButtonElement>('[data-need]').forEach((b) => {
       b.onclick = () => equipRoom(store, id, b.dataset.need);

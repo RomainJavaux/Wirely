@@ -63,6 +63,8 @@ export function openBoard(store: Store, boardId: number, deviceId?: number): voi
   const found = deviceId === undefined ? null : locateDevice(store.state.doc, deviceId);
   store.change((s) => {
     s.mode = 'board';
+    // Un appareil précis se montre sur les rails ; sinon on arrive sur la liste des circuits.
+    s.boardView = found && found.board.id === boardId ? 'front' : 'circuits';
     s.boardId = boardId;
     s.armedKind = null;
     s.deviceSelection = found?.board.id === boardId ? deviceId! : null;

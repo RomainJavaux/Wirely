@@ -44,6 +44,18 @@ export class Viewport {
   }
 
   /**
+   * Geste à deux doigts : zoome autour du point (px, py) et déplace la vue de (dx, dy), en une
+   * seule notification.
+   */
+  pinch(px: number, py: number, factor: number, dx: number, dy: number): void {
+    const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.k * factor));
+    this.x = px - (px - this.x) * (k / this.k) + dx;
+    this.y = py - (py - this.y) * (k / this.k) + dy;
+    this.k = k;
+    this.notify();
+  }
+
+  /**
    * Cadre `bounds` dans une zone de width × height pixels (centré si null).
    * Sans effet si la zone est trop petite pour cadrer quoi que ce soit (canevas masqué ou
    * pas encore mis en page) : on garde alors la vue courante au lieu de calculer une échelle absurde.

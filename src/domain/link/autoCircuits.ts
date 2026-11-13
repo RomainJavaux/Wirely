@@ -165,7 +165,7 @@ export function planCircuits(doc: Pick<Doc, 'items' | 'project'>, opts: { onlyUn
   const lightCircuits: { label: string; symbols: SymbolItem[] }[] = [];
   const litRooms = new Set(lights.map((l) => ctx.roomName(l))).size;
   // Deux circuits d'éclairage au moins dès que le logement compte plus de deux locaux éclairés.
-  const mustSplit = lights.length > MAX_LIGHTS || (be && litRooms > 2 && lights.length >= 2);
+  const mustSplit = lights.length > MAX_LIGHTS || (litRooms > 2 && lights.length >= rules.minLightingCircuits);
   if (!mustSplit) {
     if (lights.length > 0) lightCircuits.push({ label: 'Éclairage', symbols: lights });
   } else {

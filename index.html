@@ -2,233 +2,272 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Wirely</title>
-  <meta name="description" content="Dessinez le plan électrique de votre logement et configurez votre tableau, puis exportez la documentation.">
+  <meta name="description" content="Relevé, étude et dossier de contrôle d'une installation électrique : comptez les points pièce par pièce, Wirely produit le schéma unifilaire et le schéma de position.">
   <meta name="theme-color" content="#2563eb">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/site.webmanifest">
 </head>
-<body>
-  <header>
-    <a class="brand" href="./" title="Wirely"><img src="/logo.svg" alt="Wirely" width="123" height="30"></a>
-    <div class="tabs" role="tablist" aria-label="Mode d'édition">
-      <button data-mode="plan" class="active">🏠 Plan</button>
-      <button data-mode="board">🔌 Tableau</button>
-      <button data-mode="view3d">🧊 3D</button>
-      <button data-mode="dossier">📄 Dossier</button>
-    </div>
-    <input id="docName" type="text" placeholder="Nom du projet" aria-label="Nom du projet">
-    <span class="sep"></span>
-    <button id="undo" title="Annuler (Ctrl+Z)">↶ Annuler</button>
-    <button id="redo" title="Rétablir (Ctrl+Y)">↷ Rétablir</button>
-    <span class="spacer"></span>
-    <div id="cloudBar" class="cloud-bar"></div>
-    <span class="sep"></span>
-    <button id="newDoc">Nouveau</button>
-    <button id="openDoc">Ouvrir…</button>
-    <button id="saveDoc">Enregistrer (.json)</button>
-    <div class="menu" id="exportMenu">
-      <button class="primary" id="exportBtn">Exporter ▾</button>
-      <div class="drop">
-        <button data-exp="png">Image PNG</button>
-        <button data-exp="svg">Image SVG</button>
-        <button data-exp="pdf">PDF / Imprimer</button>
-        <button data-exp="csv" id="csvBtn">Circuits (CSV)</button>
-        <button data-exp="csv2" class="plan-only">Nomenclature (CSV)</button>
-      </div>
-    </div>
-    <input id="fileIn" type="file" accept=".json,application/json" hidden>
-  </header>
-  <div id="banner" class="banner" hidden></div>
+<body data-mode="home">
+  <div id="app">
+    <!-- Navigation : barre latérale sur ordinateur, barre du bas sur téléphone -->
+    <nav id="nav" aria-label="Espaces du chantier">
+      <a class="brand" href="./" title="Wirely"><img src="/favicon.svg" alt="Wirely" width="32" height="32"></a>
+      <button type="button" data-mode="home" class="active">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h2V5a1 1 0 0 1 1-1Z"/><path d="M9 11h6M9 15h4"/></svg>
+        <span>Chantier</span>
+      </button>
+      <button type="button" data-mode="rooms">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v6H4zM13 5h7v9h-7zM4 13h7v6H4zM13 16h7v3h-7z"/></svg>
+        <span>Pièces</span>
+        <i class="nav-badge" id="navRooms" hidden></i>
+      </button>
+      <button type="button" data-mode="board">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8v8M12 8v8M16 8v8M6.5 12h3M10.5 12h3M14.5 12h3"/></svg>
+        <span>Tableau</span>
+        <i class="nav-badge" id="navBoard" hidden></i>
+      </button>
+      <button type="button" data-mode="plan">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2Z"/><path d="M9 4v14M15 6v14"/></svg>
+        <span>Plan</span>
+        <i class="nav-badge" id="navPlan" hidden></i>
+      </button>
+      <button type="button" data-mode="dossier">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M15 3v4h4M9 12h6M9 16h6"/></svg>
+        <span>Dossier</span>
+        <i class="nav-badge" id="navDossier" hidden></i>
+      </button>
+    </nav>
 
-  <main id="planMain">
-    <aside class="left">
-      <h3>Pièces</h3>
-      <button id="addRoomBtn" class="primary wide" title="Ajouter une pièce en indiquant ses dimensions">＋ Ajouter une pièce</button>
-      <form id="roomForm" class="roomform" hidden autocomplete="off">
-        <label class="f" for="rfKind">Type</label>
-        <select id="rfKind"></select>
-        <label class="f" for="rfName">Nom <small>(facultatif)</small></label>
-        <input type="text" id="rfName" placeholder="ex. Chambre parents">
-        <div class="two">
-          <div><label class="f" for="rfW">Largeur (m)</label><input type="number" id="rfW" min="0.5" step="0.1" inputmode="decimal"></div>
-          <div><label class="f" for="rfD">Profondeur (m)</label><input type="number" id="rfD" min="0.5" step="0.1" inputmode="decimal"></div>
+    <div id="shell">
+      <header id="top">
+        <input id="docName" type="text" placeholder="Nom du chantier" aria-label="Nom du chantier">
+        <button type="button" id="countryBtn" class="ghost" title="Pays et règles appliquées"></button>
+        <span class="spacer"></span>
+        <button type="button" id="activeChip" class="active-chip" title="Circuit actif : ce que vous ajoutez s'y raccorde" hidden></button>
+        <button type="button" id="undo" class="icon" title="Annuler (Ctrl+Z)" aria-label="Annuler">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+        </button>
+        <button type="button" id="redo" class="icon" title="Rétablir (Ctrl+Y)" aria-label="Rétablir">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+        </button>
+        <div id="cloudBar" class="cloud-bar"></div>
+        <div class="menu" id="fileMenu">
+          <button type="button" id="fileBtn" class="icon" title="Fichier" aria-label="Fichier">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+          <div class="drop">
+            <button type="button" id="newDoc">Nouveau chantier</button>
+            <button type="button" id="openDoc">Ouvrir un fichier…</button>
+            <button type="button" id="saveDoc">Enregistrer une copie (.json)</button>
+            <button type="button" id="exampleDoc">Charger un exemple</button>
+          </div>
         </div>
-        <div class="row">
-          <button type="submit" class="primary">Ajouter</button>
-          <button type="button" id="rfClose">Fermer</button>
+        <input id="fileIn" type="file" accept=".json,application/json" hidden>
+      </header>
+      <div id="banner" class="banner" hidden></div>
+
+      <!-- Chantier : où en suis-je, que reste-t-il ? -->
+      <main id="homeMain"><div id="homeView" class="page"></div></main>
+
+      <!-- Pièces : compter les points, pièce par pièce -->
+      <main id="roomsMain" hidden><div id="roomsView"></div></main>
+
+      <!-- Tableau : circuits, face avant, unifilaire -->
+      <main id="boardMain" hidden>
+        <div id="boardTop">
+          <div class="seg" id="boardTabs" role="tablist">
+            <button type="button" data-bview="circuits">Circuits</button>
+            <button type="button" data-bview="front">Face avant</button>
+            <button type="button" data-bview="uni">Unifilaire</button>
+          </div>
         </div>
-        <p class="muted">La pièce se colle à la pièce sélectionnée. Vous pouvez enchaîner : Entrée valide.</p>
-      </form>
 
-      <h3>Dessiner</h3>
-      <div class="tools" id="tools"></div>
+        <div id="circuitsView" class="page"></div>
+        <div id="schemaView" hidden></div>
 
-      <h3>Ouvertures</h3>
-      <div class="palette" id="openings"></div>
+        <div id="boardWork" hidden>
+          <aside class="left" id="boardPalette"></aside>
 
-      <h3>Appareillage</h3>
-      <div id="palette"></div>
+          <div id="boardStage">
+            <div id="boardEmpty" class="board-empty">
+              <div>
+                <h2>Aucun tableau</h2>
+                <p>Ajoutez vos circuits dans l'onglet « Circuits » : les appareils se rangent ici d'eux-mêmes.
+                  Vous pouvez aussi partir d'un modèle ou d'un tableau vide.</p>
+                <div class="stack">
+                  <button class="primary" id="bEmptyGenerate">Générer depuis les points</button>
+                  <button id="bEmptyQuick">Saisie rapide au clavier</button>
+                  <div class="row tight">
+                    <button id="bEmptyExample">Modèle logement</button>
+                    <button id="bEmptyBlank">Tableau vide</button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      <details class="adv">
-        <summary>Câblage manuel</summary>
-        <p class="muted">Facultatif : le tableau et les longueurs de câble se déduisent des appareils.</p>
-        <div class="tools" id="wiringTools"></div>
-        <h3>Circuit actif</h3>
-        <div id="activeCircuitBox"></div>
-        <h3>Type de câble</h3>
-        <div class="wires" id="wireTypes"></div>
-      </details>
-      <details class="adv">
-        <summary>Affichage et échelle</summary>
-        <div class="viewopts" id="viewOpts"></div>
-        <h3>Échelle</h3>
-        <div id="scaleBox"></div>
-      </details>
-    </aside>
-
-    <div id="stage">
-      <div id="canvasWrap">
-        <svg id="svg" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="gridS" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e8ecf2" stroke-width="1"/></pattern>
-            <pattern id="gridL" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#d3d9e3" stroke-width="1"/></pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#gridS)"/>
-          <rect width="100%" height="100%" fill="url(#gridL)"/>
-          <g id="world"></g>
-        </svg>
-        <div id="empty">
-          <div class="start">
-            <h2>Par où commencer ?</h2>
-            <p>Wirely déduit l'équipement, les circuits et le tableau de vos pièces. Décrivez-les, le reste suit.</p>
-            <div class="start-cards">
-              <button type="button" id="startRoom" class="card primary">
-                <b>Décrire mes pièces</b>
-                <span>Type et dimensions : séjour 5 × 4 m, cuisine 3,5 × 3 m…</span>
-              </button>
-              <button type="button" id="exampleBtn" class="card">
-                <b>Voir un exemple</b>
-                <span>Un appartement de 76 m² équipé, avec son tableau.</span>
-              </button>
-              <button type="button" id="startOpen" class="card">
-                <b>Ouvrir un fichier</b>
-                <span>Reprendre un projet enregistré (.json).</span>
-              </button>
+            <div id="boardContent">
+              <div id="boardBar">
+                <select id="bSelect" aria-label="Tableau"></select>
+                <button id="bAdd" title="Ajouter un tableau">+ Tableau</button>
+                <button id="bQuick" title="Saisir les circuits au clavier, une ligne par appareil">Saisie rapide</button>
+                <button id="bDel" class="danger" title="Supprimer ce tableau">Supprimer</button>
+                <span class="sep"></span>
+                <input id="bName" type="text" placeholder="Nom du tableau" aria-label="Nom du tableau">
+                <input id="bLoc" type="text" placeholder="Emplacement (ex. Garage)" aria-label="Emplacement">
+                <select id="bSupply" aria-label="Alimentation">
+                  <option value="mono">Monophasé 230 V</option>
+                  <option value="tri">Triphasé 400 V</option>
+                </select>
+                <span class="cols" title="Nombre de modules (17,5 mm) sur chaque rail">
+                  <select id="bColsPreset" aria-label="Largeur du tableau"></select>
+                  <input id="bCols" type="number" inputmode="numeric" step="1" aria-label="Nombre de modules par rail" hidden>
+                </span>
+                <span class="rails">Rails
+                  <button id="bRowMinus" title="Retirer un rail vide">−</button>
+                  <b id="bRows">3</b>
+                  <button id="bRowPlus" title="Ajouter un rail">+</button>
+                </span>
+                <button id="bCompact" title="Aligner les appareils à gauche, sans trous">Compacter</button>
+                <span class="sep"></span>
+                <label class="planlink" title="Symbole « tableau » du plan qui représente ce tableau">Plan
+                  <select id="bPlan" aria-label="Symbole du plan lié à ce tableau"></select>
+                </label>
+                <button id="bPlanGo" title="Voir ce symbole sur le plan">↗</button>
+                <span class="spacer"></span>
+                <button id="bZoomOut" title="Dézoomer">−</button>
+                <button id="bFit" title="Ajuster à la fenêtre">Ajuster</button>
+                <button id="bZoomIn" title="Zoomer">+</button>
+              </div>
+              <div id="boardScroll"><div id="boardHost"></div></div>
+              <div id="boardHint"></div>
             </div>
           </div>
-        </div>
-        <div id="scaleBar" hidden><span class="bar"></span><b></b></div>
-        <div id="hint"></div>
-        <button id="wallsToggle" class="drawer-toggle" title="Voir et régler les murs de la pièce sélectionnée">▤ Murs ▴</button>
-        <div id="zoomBox">
-          <button id="zOut" title="Dézoomer">−</button>
-          <button id="zFit" title="Ajuster à la vue">Ajuster</button>
-          <button id="zIn" title="Zoomer">+</button>
-        </div>
-      </div>
 
-      <section id="wallDrawer" hidden aria-label="Murs de la pièce">
-        <div id="wallsBar">
-          <strong id="wallsTitle"></strong>
-          <div id="wallsFaces" class="seg"></div>
-          <label class="inl" title="Hauteur sous plafond, commune à toutes les pièces">Plafond
-            <input id="wCeiling" type="number" inputmode="numeric" min="180" max="500" step="5"> cm
-          </label>
-          <span class="spacer"></span>
-          <button id="wZoomOut" title="Dézoomer">−</button>
-          <button id="wFit" title="Ajuster">Ajuster</button>
-          <button id="wZoomIn" title="Zoomer">+</button>
-          <button id="wClose" title="Fermer le tiroir des murs">✕</button>
+          <aside class="right" id="boardSide"></aside>
         </div>
-        <div id="wallsBody">
-          <div id="wallsPalette" aria-label="Appareils à poser sur le mur"></div>
-          <div id="wallsScroll"><div id="wallsHost"></div></div>
-        </div>
-        <div id="wallsHint"></div>
-      </section>
-    </div>
+      </main>
 
-    <aside class="right wide"><div id="props"></div></aside>
-  </main>
+      <!-- Plan : situer chaque point -->
+      <main id="planMain" hidden>
+        <aside class="left" id="planLeft">
+          <h3>Pièces</h3>
+          <button id="addRoomBtn" class="primary wide" title="Ajouter une pièce en indiquant ses dimensions">＋ Ajouter une pièce</button>
+          <form id="roomForm" class="roomform" hidden autocomplete="off">
+            <label class="f" for="rfKind">Type</label>
+            <select id="rfKind"></select>
+            <label class="f" for="rfName">Nom <small>(facultatif)</small></label>
+            <input type="text" id="rfName" placeholder="ex. Chambre parents">
+            <div class="two">
+              <div><label class="f" for="rfW">Largeur (m)</label><input type="number" id="rfW" min="0.5" step="0.1" inputmode="decimal"></div>
+              <div><label class="f" for="rfD">Profondeur (m)</label><input type="number" id="rfD" min="0.5" step="0.1" inputmode="decimal"></div>
+            </div>
+            <div class="row">
+              <button type="submit" class="primary">Ajouter</button>
+              <button type="button" id="rfClose">Fermer</button>
+            </div>
+            <p class="muted">La pièce se colle à la pièce sélectionnée. Entrée valide : vous pouvez enchaîner.</p>
+          </form>
 
-  <main id="boardMain" hidden>
-    <aside class="left" id="boardPalette"></aside>
+          <h3>Dessiner</h3>
+          <div class="tools" id="tools"></div>
 
-    <div id="boardStage">
-      <div id="boardEmpty" class="board-empty">
-        <div>
-          <h2>Configurez votre tableau électrique</h2>
-          <p>Générez-le depuis le plan, saisissez les circuits au clavier devant un tableau existant,
-            ou posez des appareils sur des rails DIN. Vous obtenez la face avant étiquetée, le schéma
-            unifilaire, la liste des circuits et la nomenclature.</p>
-          <div class="stack">
-            <button class="primary" id="bEmptyGenerate">Générer depuis le plan</button>
-            <button id="bEmptyQuick">Saisie rapide au clavier</button>
-            <div class="row tight">
-              <button id="bEmptyExample">Modèle logement</button>
-              <button id="bEmptyBlank">Tableau vide</button>
+          <h3>Ouvertures</h3>
+          <div class="palette" id="openings"></div>
+
+          <h3>Poser un point</h3>
+          <div id="palette"></div>
+
+          <details class="adv">
+            <summary>Câblage manuel</summary>
+            <p class="muted">Facultatif : les schémas et les longueurs de câble se déduisent des points.</p>
+            <div class="tools" id="wiringTools"></div>
+            <h3>Circuit actif</h3>
+            <div id="activeCircuitBox"></div>
+            <h3>Type de câble</h3>
+            <div class="wires" id="wireTypes"></div>
+          </details>
+          <details class="adv">
+            <summary>Affichage et échelle</summary>
+            <div class="viewopts" id="viewOpts"></div>
+            <h3>Échelle</h3>
+            <div id="scaleBox"></div>
+          </details>
+        </aside>
+
+        <div id="stage">
+          <div id="canvasWrap">
+            <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="gridS" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#edf0f5" stroke-width="1"/></pattern>
+                <pattern id="gridL" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M100 0H0V100" fill="none" stroke="#dde2ea" stroke-width="1"/></pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#gridS)"/>
+              <rect width="100%" height="100%" fill="url(#gridL)"/>
+              <g id="world"></g>
+            </svg>
+            <div id="empty">
+              <div class="start">
+                <h2>Le plan est vide</h2>
+                <p>Les pièces créées dans l'espace « Pièces » apparaissent ici, avec leurs points. Vous pouvez aussi en ajouter directement.</p>
+                <div class="row">
+                  <button type="button" id="startRoom" class="primary">Ajouter une pièce</button>
+                  <button type="button" id="exampleBtn">Charger un exemple</button>
+                  <button type="button" id="startOpen">Ouvrir un fichier</button>
+                </div>
+              </div>
+            </div>
+            <div id="planChips"></div>
+            <div id="scaleBar" hidden><span class="bar"></span><b></b></div>
+            <div id="hint"></div>
+            <div id="planCorner">
+              <button id="planToolsBtn" class="only-mobile" title="Outils">Outils</button>
+              <button id="view3dBtn" title="Voir la maison en trois dimensions">3D</button>
+              <button id="wallsToggle" class="drawer-toggle" title="Voir et régler les murs de la pièce sélectionnée">Murs</button>
+            </div>
+            <div id="zoomBox">
+              <button id="zOut" title="Dézoomer">−</button>
+              <button id="zFit" title="Ajuster à la vue">Ajuster</button>
+              <button id="zIn" title="Zoomer">+</button>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div id="boardContent">
-        <div id="boardBar">
-          <select id="bSelect" aria-label="Tableau"></select>
-          <button id="bAdd" title="Ajouter un tableau">+ Tableau</button>
-          <button id="bQuick" title="Saisir les circuits au clavier, une ligne par appareil">⌨ Saisie rapide</button>
-          <button id="bDel" class="danger" title="Supprimer ce tableau">Supprimer</button>
-          <span class="sep"></span>
-          <input id="bName" type="text" placeholder="Nom du tableau" aria-label="Nom du tableau">
-          <input id="bLoc" type="text" placeholder="Emplacement (ex. Garage)" aria-label="Emplacement">
-          <select id="bSupply" aria-label="Alimentation">
-            <option value="mono">Monophasé 230 V</option>
-            <option value="tri">Triphasé 400 V</option>
-          </select>
-          <span class="cols" title="Nombre de modules (17,5 mm) sur chaque rail">
-            <select id="bColsPreset" aria-label="Largeur du tableau"></select>
-            <input id="bCols" type="number" inputmode="numeric" step="1" aria-label="Nombre de modules par rail" hidden>
-          </span>
-          <span class="rails">Rails
-            <button id="bRowMinus" title="Retirer un rail vide">−</button>
-            <b id="bRows">3</b>
-            <button id="bRowPlus" title="Ajouter un rail">+</button>
-          </span>
-          <button id="bCompact" title="Aligner les appareils à gauche, sans trous">Compacter</button>
-          <span class="sep"></span>
-          <label class="planlink" title="Symbole « tableau » du plan qui représente ce tableau">Plan
-            <select id="bPlan" aria-label="Symbole du plan lié à ce tableau"></select>
-          </label>
-          <button id="bPlanGo" title="Voir ce symbole sur le plan">↗</button>
-          <span class="spacer"></span>
-          <div class="seg">
-            <button id="bViewFront" class="active">Face avant</button>
-            <button id="bViewUni">Unifilaire</button>
-          </div>
-          <button id="bZoomOut" title="Dézoomer">−</button>
-          <button id="bFit" title="Ajuster à la fenêtre">Ajuster</button>
-          <button id="bZoomIn" title="Zoomer">+</button>
+          <section id="wallDrawer" hidden aria-label="Murs de la pièce">
+            <div id="wallsBar">
+              <strong id="wallsTitle"></strong>
+              <div id="wallsFaces" class="seg"></div>
+              <label class="inl" title="Hauteur sous plafond, commune à toutes les pièces">Plafond
+                <input id="wCeiling" type="number" inputmode="numeric" min="180" max="500" step="5"> cm
+              </label>
+              <span class="spacer"></span>
+              <button id="wZoomOut" title="Dézoomer">−</button>
+              <button id="wFit" title="Ajuster">Ajuster</button>
+              <button id="wZoomIn" title="Zoomer">+</button>
+              <button id="wClose" title="Fermer le tiroir des murs">✕</button>
+            </div>
+            <div id="wallsBody">
+              <div id="wallsPalette" aria-label="Appareils à poser sur le mur"></div>
+              <div id="wallsScroll"><div id="wallsHost"></div></div>
+            </div>
+            <div id="wallsHint"></div>
+          </section>
         </div>
-        <div id="boardScroll"><div id="boardHost"></div></div>
-        <div id="boardHint"></div>
-      </div>
+
+        <aside class="right wide" id="planRight"><div id="props"></div></aside>
+      </main>
+
+      <main id="view3dMain" hidden>
+        <button id="view3dBack" type="button" title="Revenir au plan en deux dimensions">← Plan</button>
+        <div id="view3dStage"></div>
+        <aside class="right" id="view3dSide"></aside>
+      </main>
+
+      <!-- Dossier : ce que l'on remet -->
+      <main id="dossierMain" hidden><div id="dossierView"></div></main>
     </div>
-
-    <aside class="right" id="boardSide"></aside>
-  </main>
-
-  <main id="view3dMain" hidden>
-    <div id="view3dStage"></div>
-    <aside class="right" id="view3dSide"></aside>
-  </main>
-
-  <main id="dossierMain" hidden>
-    <aside class="left" id="dossierOptions"></aside>
-    <div id="dossierStage"><div id="dossierSheet"></div></div>
-  </main>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 

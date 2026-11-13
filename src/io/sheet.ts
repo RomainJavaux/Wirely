@@ -16,6 +16,10 @@ export interface SheetSection {
   svg: string;
   width: number;
   height: number;
+  /** Taille réelle à l'impression, en millimètres (étiquettes du tableau). */
+  mm?: { w: number; h: number };
+  /** Dessin qui peut être agrandi pour occuper la largeur de la page (schéma, face avant). */
+  grow?: boolean;
 }
 
 export interface Column<T> {

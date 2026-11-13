@@ -33,6 +33,7 @@ import {
 } from '../src/domain/link/links';
 import { createDoc, parseDoc } from '../src/domain/document';
 import { runPlanChecks } from '../src/domain/plan/checks';
+import { runProjectChecks } from '../src/domain/rules/checks';
 import type { Doc, Item, Room, SymbolItem, Wire } from '../src/domain/types';
 import { buildBoardSheetSvg } from '../src/io/boardSheet';
 import { buildExportSvg } from '../src/io/exporter';
@@ -471,8 +472,8 @@ describe('contrôles croisés plan / tableau', () => {
 // ------------------------------------------------------------------ exemple et exports
 
 describe('exemple relié', () => {
-  it('crée un tableau et relie câbles, appareils et symbole du tableau', () => {
-    const store = new Store(createDoc());
+  it('déduit le tableau des points et relie câbles, appareils et symbole du tableau', () => {
+    const store = new Store(createDoc()); // Belgique par défaut
     expect(loadExamplePlan(store)).toBe(true);
     const { doc } = store.state;
 
@@ -481,15 +482,33 @@ describe('exemple relié', () => {
     expect(tableau?.board).toBe(doc.boards[0]!.id);
     expect(store.state.boardId).toBe(doc.boards[0]!.id);
 
+    // Tout est raccordé : appareils et câbles dessinés.
     const u = unlinkedItems(doc);
-    // Seuls le détecteur de fumée n'a pas de circuit dédié dans l'exemple.
     expect(u.wires).toHaveLength(0);
-    expect(u.symbols.every((s) => s.kind === 'fumee')).toBe(true);
+    expect(u.symbols).toHaveLength(0);
 
-    const cuisine = circuitOptions(doc).find((o) => o.label === 'Prises cuisine')!;
+    const options = circuitOptions(doc);
+    const cuisine = options.find((o) => o.label === 'Prises Cuisine')!;
     expect(allLinks(doc).get(cuisine.id)?.sockets).toBe(6);
-    const plaque = circuitOptions(doc).find((o) => o.label === 'Plaque de cuisson')!;
-    expect(allLinks(doc).get(plaque.id)?.wires).toHaveLength(1);
+    // Vocabulaire et repères belges : la « taque », des lettres.
+    const taque = options.find((o) => o.label === 'Taque de cuisson')!;
+    expect(allLinks(doc).get(taque.id)?.wires).toHaveLength(1);
+    expect(options[0]!.ref).toBe('A');
+    // Le chantier d'exemple est renseigné, et rien ne bloque le dossier.
+    expect(doc.project.address).toContain('Liège');
+    expect(runProjectChecks(doc).filter((c) => c.severity !== 'info')).toEqual([]);
+  });
+
+  it('suit la NF C 15-100 pour un chantier français', () => {
+    const store = new Store(createDoc(undefined, 'FR'));
+    loadExamplePlan(store);
+    const { doc } = store.state;
+    const options = circuitOptions(doc);
+    expect(options.map((o) => o.label)).toContain('Plaque de cuisson');
+    expect(options[0]!.ref).toBe('1');
+    expect(unlinkedItems(doc).symbols).toHaveLength(0);
+    // L'exemple respecte les repères qu'il illustre : aucune remarque sur l'installation.
+    expect(runProjectChecks(doc).filter((c) => c.where !== 'home')).toEqual([]);
   });
 
   it('ne duplique pas le tableau s’il en existe déjà un', () => {

@@ -96,12 +96,12 @@ export class CloudBar {
     } else if (r.kind === 'viewing') {
       parts.push(`<span class="chip viewing">👁 Consultation</span>`);
     } else {
-      parts.push(`<button data-act="save" title="Enregistrer dans votre compte et obtenir un lien">☁ Enregistrer en ligne</button>`);
+      parts.push(`<button data-act="save" title="Enregistrer dans votre compte et obtenir un lien">☁<span class="wide-only"> Enregistrer en ligne</span></button>`);
     }
 
     if (!auth.ready) parts.push('');
-    else if (auth.user) parts.push(`<button data-act="account" title="${esc(auth.user.email)}">👤 ${esc(auth.user.name)}</button>`);
-    else parts.push(`<button data-act="login">Se connecter</button>`);
+    else if (auth.user) parts.push(`<button data-act="account" title="${esc(auth.user.email)}">👤<span class="wide-only"> ${esc(auth.user.name)}</span></button>`);
+    else parts.push(`<button data-act="login" title="Se connecter">👤<span class="wide-only"> Se connecter</span></button>`);
 
     this.bar.innerHTML = parts.join('');
     this.renderBanner();

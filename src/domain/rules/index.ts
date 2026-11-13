@@ -31,7 +31,6 @@ export interface RuleSet {
   code: string;
   /** « Belgique · RGIE ». */
   label: string;
-  flag: string;
   refScheme: RefScheme;
   /** Sections courantes (mm²) et calibre maximal du disjoncteur associé. */
   sections: readonly number[];
@@ -61,7 +60,6 @@ const BE: RuleSet = {
   country: 'BE',
   code: 'RGIE',
   label: 'Belgique · RGIE',
-  flag: '🇧🇪',
   refScheme: 'letters',
   sections: [1.5, 2.5, 4, 6, 10, 16],
   maxRating: { 1.5: 16, 2.5: 20, 4: 25, 6: 40, 10: 63, 16: 80 },
@@ -87,7 +85,6 @@ const FR: RuleSet = {
   country: 'FR',
   code: 'NF C 15-100',
   label: 'France · NF C 15-100',
-  flag: '🇫🇷',
   refScheme: 'numbers',
   sections: [1.5, 2.5, 4, 6, 10, 16],
   maxRating: { 1.5: 16, 2.5: 20, 4: 25, 6: 32, 10: 40, 16: 63 },

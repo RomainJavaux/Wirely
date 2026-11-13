@@ -332,7 +332,7 @@ describe('navigation vers les murs et la 3D', () => {
     expect(showItemOnWall(store, 2)).toBe(false);
     expect(showItemOnWall(store, 3)).toBe(false);
     expect(showItemOnWall(store, 99)).toBe(false);
-    expect(store.state.mode).toBe('plan');
+    expect(store.state.mode).toBe('home'); // rien n'a changé d'espace
   });
 
   it('showWall choisit une face précise, showItemIn3D ouvre la vue 3D', () => {

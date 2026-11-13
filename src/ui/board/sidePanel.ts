@@ -50,8 +50,8 @@ export class BoardSidePanel {
   }
 
   private render(): void {
-    const { deviceSelection, mode } = this.store.state;
-    if (mode !== 'board') return;
+    const { deviceSelection, mode, boardView } = this.store.state;
+    if (mode !== 'board' || boardView !== 'front') return;
     const board = this.store.activeBoard;
 
     // Dans l'onglet Circuits la sélection ne reconstruit pas la liste (position de défilement, recherche) :
