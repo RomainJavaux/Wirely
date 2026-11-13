@@ -1,5 +1,6 @@
-import { MAX_RATING_FOR_SECTION, getDeviceDef } from './catalog';
+import { getDeviceDef } from './catalog';
 import { analyze, devicesInRow, deviceWidth, effectiveSection, isCircuitRole } from './layout';
+import { RULES, type RuleSet } from '../rules';
 import type { Board } from './types';
 
 export type Severity = 'error' | 'warn' | 'info';
@@ -23,9 +24,10 @@ export const RESERVE_RATIO = 0.2;
  * Contrôles simples d'aide à la conception. Ils ne remplacent pas la vérification
  * d'un professionnel ni les règles de la norme en vigueur.
  */
-export function runChecks(board: Board): Check[] {
+export function runChecks(board: Board, rules: RuleSet = RULES.FR): Check[] {
   const checks: Check[] = [];
-  const a = analyze(board);
+  const a = analyze(board, rules.refScheme);
+  const be = rules.country === 'BE';
 
   for (const d of board.devices) {
     const w = deviceWidth(d);
@@ -42,7 +44,7 @@ export function runChecks(board: Board): Check[] {
 
     const section = effectiveSection(d);
     if (section !== null && d.rating !== null) {
-      const max = MAX_RATING_FOR_SECTION[section];
+      const max = rules.maxRating[section];
       if (max !== undefined && d.rating > max) {
         checks.push({
           severity: 'error',
@@ -54,8 +56,9 @@ export function runChecks(board: Board): Check[] {
 
     const rcd = a.protectedBy.get(d.id) ?? null;
     if (!rcd) {
-      checks.push({ severity: 'warn', deviceId: d.id, message: `${ref}${name} : aucun différentiel en amont sur ce rail.` });
-    } else if ((rcd.sensitivity ?? 30) > 30) {
+      checks.push({ severity: 'warn', deviceId: d.id, message: `${ref}${name} : aucun différentiel en amont.` });
+    } else if (!be && (rcd.sensitivity ?? 30) > 30) {
+      // En Belgique, un différentiel général de 300 mA en tête est la règle : pas d'alerte.
       checks.push({ severity: 'warn', deviceId: d.id, message: `${ref}${name} : différentiel ${rcd.sensitivity} mA (30 mA attendu en habitation).` });
     }
 
@@ -64,7 +67,20 @@ export function runChecks(board: Board): Check[] {
     }
   }
 
+  // Belgique : le différentiel de tête est de 300 mA au plus, de type A.
+  const firstHead = a.groups.find((g) => g.head)?.head ?? null;
+  if (be && firstHead) {
+    if ((firstHead.sensitivity ?? 30) > 300) {
+      checks.push({ severity: 'warn', deviceId: firstHead.id, message: `Différentiel général de ${firstHead.sensitivity} mA : 300 mA au plus.` });
+    }
+    if (firstHead.diffType === 'AC') {
+      checks.push({ severity: 'warn', deviceId: firstHead.id, message: 'Différentiel général de type AC : le type A est attendu.' });
+    }
+  }
+
   for (const g of a.groups) {
+    // Le nombre de circuits par différentiel est un repère français.
+    if (be) break;
     if (!g.head || g.head.rating === null) continue;
     const limit = MAX_CIRCUITS_PER_RCD[g.head.rating];
     const count = g.members.filter((m) => {

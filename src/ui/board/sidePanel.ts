@@ -18,6 +18,7 @@ import {
   type CircuitLinks,
 } from '../../domain/link/links';
 import { fmtLength, polylineLength, toMeters } from '../../domain/plan/metrics';
+import { refSchemeOf, rulesOf } from '../../domain/rules';
 import { esc } from '../../util/escape';
 
 const option = (value: string | number, label: string, selected: boolean): string =>
@@ -69,7 +70,7 @@ export class BoardSidePanel {
       return;
     }
 
-    const a = analyze(board);
+    const a = analyze(board, refSchemeOf(this.store.state.doc));
     const tabs = `<div class="seg side-tabs">
         <button type="button" data-tab="settings" class="${this.tab === 'settings' ? 'active' : ''}">Réglages</button>
         <button type="button" data-tab="circuits" class="${this.tab === 'circuits' ? 'active' : ''}">Circuits <span class="badge">${a.circuits.length}</span></button>
@@ -99,7 +100,7 @@ export class BoardSidePanel {
 
   private circuitsTab(board: Board): string {
     const { doc, boardFilter } = this.store.state;
-    const a = analyze(board);
+    const a = analyze(board, refSchemeOf(this.store.state.doc));
     const links = allLinks(doc);
 
     const rows = (members: Device[]): string =>
@@ -207,7 +208,7 @@ export class BoardSidePanel {
 
   private summary(board: Board): string {
     const { doc } = this.store.state;
-    const a = analyze(board);
+    const a = analyze(board, refSchemeOf(this.store.state.doc));
     const free = a.totalModules - a.usedModules;
     const pct = a.totalModules ? Math.round((free / a.totalModules) * 100) : 0;
     const low = a.totalModules > 0 && free / a.totalModules < RESERVE_RATIO;
@@ -244,7 +245,7 @@ export class BoardSidePanel {
     const { doc } = this.store.state;
     const def = getDeviceDef(d.kind);
     if (!def) return '';
-    const a = analyze(board);
+    const a = analyze(board, refSchemeOf(this.store.state.doc));
 
     if (def.role === 'rcd') {
       const group = a.groups.find((g) => g.head?.id === d.id);
@@ -304,7 +305,7 @@ export class BoardSidePanel {
   private deviceForm(board: Board, d: Device): string {
     const def = getDeviceDef(d.kind);
     if (!def) return '';
-    const a = analyze(board);
+    const a = analyze(board, refSchemeOf(this.store.state.doc));
     const circuit = isCircuitRole(def);
     const ref = a.refs.get(d.id);
     let h = `<h3>${esc(def.name)}${ref ? ` · ${esc(ref)}` : ''}</h3>`;
@@ -438,7 +439,7 @@ export class BoardSidePanel {
 
   private checksHtml(board: Board): string {
     const { doc } = this.store.state;
-    const checks = [...runChecks(board), ...runLinkChecks(doc, board)];
+    const checks = [...runChecks(board, rulesOf(doc)), ...runLinkChecks(doc, board)];
     if (board.devices.length === 0) return '';
     if (checks.length === 0) return `<h3>Contrôles</h3><p class="ok">✔ Aucun point d'attention.</p>`;
     const items = checks

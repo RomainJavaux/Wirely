@@ -372,3 +372,45 @@ export function describeEquip(byKind: Record<string, number>, fallback: (kind: s
     })
     .join(', ');
 }
+
+/**
+ * Emplacement d'un point que l'on vient de compter dans une pièce : au milieu du plus grand espace
+ * libre d'un mur (à côté de la porte pour une commande), ou au plafond, à l'écart des autres.
+ * La position est un point de départ : on l'ajuste ensuite sur le plan.
+ */
+export function placePoint(doc: Work, room: Room, kind: string): { x: number; y: number; rot: SymbolItem['rot'] } {
+  const mount = mountingOf(kind);
+  const rect = largestRect(roomRects(room));
+  const center = { x: Math.round(rect.x + rect.w / 2), y: Math.round(rect.y + rect.h / 2), rot: 0 as const };
+
+  if (mount.where === 'ceiling') {
+    const others = doc.items.filter(
+      (i): i is SymbolItem => i.type === 'symbol' && mountingOf(i.kind).where === 'ceiling' && containsPoint(room, i.x, i.y),
+    );
+    if (others.length === 0) return center;
+    // Parmi une grille de positions, la plus éloignée des appareils de plafond déjà posés.
+    let best = center;
+    let bestDist = -1;
+    for (let i = 1; i <= 5; i++) {
+      for (let j = 1; j <= 5; j++) {
+        const x = Math.round(rect.x + (rect.w * i) / 6);
+        const y = Math.round(rect.y + (rect.h * j) / 6);
+        const d = Math.min(...others.map((o) => Math.hypot(o.x - x, o.y - y)));
+        if (d > bestDist) {
+          bestDist = d;
+          best = { x, y, rot: 0 };
+        }
+      }
+    }
+    return best;
+  }
+
+  const faces = roomFaces(room);
+  if (kind === 'inter' || kind === 'va' || kind === 'poussoir') {
+    const slot = switchSlots(doc, faces, 1)[0];
+    if (slot) return placeOnFace(doc, slot.face, slot.u, kind);
+  }
+  const widest = freeSegments(doc, faces, mount.height).sort((a, b) => b.to - b.from - (a.to - a.from))[0];
+  if (widest) return placeOnFace(doc, widest.face, (widest.from + widest.to) / 2, kind);
+  return center;
+}

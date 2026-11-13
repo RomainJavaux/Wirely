@@ -5,6 +5,7 @@ import { isElectrical, unlinkedItems } from '../domain/link/links';
 import { runPlanChecks } from '../domain/plan/checks';
 import { fmtArea, planSummary } from '../domain/plan/metrics';
 import { planNeeds } from '../domain/plan/needs';
+import { rulesOf } from '../domain/rules';
 import { getRoomKind } from '../domain/plan/roomKinds';
 import { esc } from '../util/escape';
 
@@ -33,7 +34,7 @@ function steps(store: Store): Step[] {
   const electrical = doc.items.filter((i) => i.type === 'symbol' && isElectrical(i)).length;
   const unlinked = unlinkedItems(doc).symbols.length;
   const hasDoors = doc.items.some((i) => i.type === 'symbol' && i.kind === 'porte');
-  const boardChecks = doc.boards.flatMap((b) => runChecks(b));
+  const boardChecks = doc.boards.flatMap((b) => runChecks(b, rulesOf(doc)));
   const errors = boardChecks.filter((c) => c.severity === 'error').length;
   const warns = boardChecks.filter((c) => c.severity === 'warn').length;
 

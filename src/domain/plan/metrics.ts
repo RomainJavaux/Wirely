@@ -1,4 +1,4 @@
-import { getSymbol } from '../catalog';
+import { LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, getSymbol } from '../catalog';
 import { GRID } from '../geometry';
 import type { Doc, Item, Point, Room, SymbolItem, Wire, WireTypeId } from '../types';
 import { roomArea, roomBox, roomContains } from './rooms';
@@ -47,10 +47,6 @@ export interface RoomStats {
   lights: number;
   switches: number;
 }
-
-const SOCKET_KINDS = new Set(['prise']);
-const LIGHT_KINDS = new Set(['lampe', 'applique', 'spot']);
-const SWITCH_KINDS = new Set(['inter', 'va', 'poussoir']);
 
 /** Pièce qui contient le point ; la plus petite (en surface) si plusieurs se recouvrent. */
 export function roomAt(rooms: readonly Room[], x: number, y: number): Room | null {

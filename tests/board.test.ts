@@ -72,9 +72,24 @@ describe('analyse électrique', () => {
     expect(analyze(board([d])).protectedBy.get(d.id)).toBeNull();
   });
 
-  it('le différentiel d’un rail ne protège pas le rail suivant', () => {
-    const d = dev('disj', 1, 0);
-    expect(analyze(board([dev('idiff', 0, 0), d])).protectedBy.get(d.id)).toBeNull();
+  it('le différentiel protège aussi les rails suivants, jusqu’au prochain différentiel', () => {
+    const id1 = dev('idiff', 0, 0);
+    const below = dev('disj', 1, 0);
+    const id2 = dev('idiff', 2, 0);
+    const last = dev('disj', 2, 2);
+    const a = analyze(board([id1, below, id2, last], { rows: 3 }));
+    expect(a.protectedBy.get(below.id)?.id).toBe(id1.id); // rail sans différentiel : alimenté par celui du dessus
+    expect(a.protectedBy.get(last.id)?.id).toBe(id2.id);
+    expect(a.groups).toHaveLength(2);
+  });
+
+  it('repère les circuits par des lettres quand on le demande (usage belge)', () => {
+    const list = Array.from({ length: 28 }, (_, i) => dev('disj', Math.floor(i / 13), i % 13));
+    const refs = analyze(board(list, { rows: 3 }), 'letters').refs;
+    expect(refs.get(list[0]!.id)).toBe('A');
+    expect(refs.get(list[25]!.id)).toBe('Z');
+    expect(refs.get(list[26]!.id)).toBe('AA');
+    expect(analyze(board(list, { rows: 3 })).refs.get(list[2]!.id)).toBe('3');
   });
 
   it('numérote les circuits dans l’ordre rail par rail', () => {

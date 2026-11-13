@@ -1,5 +1,5 @@
 import { getDeviceDef } from './catalog';
-import { MAX_COLS, MIN_COLS } from './layout';
+import { MAX_COLS, MAX_ROWS, MIN_COLS } from './layout';
 import type { Board, Curve, Device, DiffType, Supply, UsageId } from './types';
 import { USAGES } from './catalog';
 
@@ -33,6 +33,8 @@ function parseDevice(raw: unknown): Device | null {
     diffType: isStr(r.diffType) && DIFF_TYPES.includes(r.diffType) ? (r.diffType as DiffType) : null,
     usage: isStr(r.usage) && r.usage in USAGES ? (r.usage as UsageId) : null,
     section: numOrNull(r.section),
+    ...(isStr(r.cable) && r.cable.trim() ? { cable: r.cable.slice(0, 30) } : {}),
+    ...(isStr(r.laying) && r.laying.trim() ? { laying: r.laying.slice(0, 40) } : {}),
     note: isStr(r.note) ? r.note : '',
   };
 }
@@ -50,7 +52,7 @@ function parseBoard(raw: unknown): Board | null {
     location: isStr(r.location) ? r.location : '',
     supply: (r.supply === 'tri' ? 'tri' : 'mono') satisfies Supply,
     cols: isNum(r.cols) ? clamp(r.cols, MIN_COLS, MAX_COLS) : 13,
-    rows: isNum(r.rows) ? clamp(r.rows, 1, 8) : 3,
+    rows: isNum(r.rows) ? clamp(r.rows, 1, MAX_ROWS) : 3,
     devices,
   };
 }

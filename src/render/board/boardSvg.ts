@@ -1,5 +1,5 @@
 import { BUS_SYSTEMS, getDeviceDef, type BusSystem, type DeviceDef } from '../../domain/board/catalog';
-import { analyze, devicesInRow, deviceWidth, type Analysis } from '../../domain/board/layout';
+import { analyze, devicesInRow, deviceWidth, type Analysis, type RefScheme } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
 import { esc } from '../../util/escape';
 import { ACCENT } from '../items';
@@ -34,6 +34,8 @@ export interface BoardRenderOptions {
   badges?: ReadonlyMap<number, number>;
   /** Appareils qui répondent à une recherche : les autres sont mis en retrait. null : pas de recherche. */
   highlight?: ReadonlySet<number> | null;
+  /** Repérage des circuits : lettres (Belgique) ou numéros. */
+  scheme?: RefScheme;
 }
 
 export interface RenderedBoard {
@@ -165,7 +167,7 @@ function busLines(board: Board): string {
 export function renderBoard(board: Board, opts: BoardRenderOptions): RenderedBoard {
   const width = boardWidth(board);
   const height = boardHeight(board);
-  const a = analyze(board);
+  const a = analyze(board, opts.scheme);
   const supply = board.supply === 'tri' ? 'Triphasé 400 V' : 'Monophasé 230 V';
 
   let s =

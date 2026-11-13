@@ -67,7 +67,7 @@ function fixture(items: Item[] = []): { doc: Doc; board: Board; cuisine: Device;
   const cuisine = device('disj', 0, 2, { rating: 20, label: 'Prises cuisine', dest: 'Cuisine' });
   const lumiere = device('disj', 0, 3, { rating: 10, label: 'Éclairage' });
   const board: Board = { id: nid(), name: 'Principal', location: '', supply: 'mono', cols: 13, rows: 1, devices: [rcd, cuisine, lumiere] };
-  const doc = { ...createDoc('Test'), items, boards: [board] };
+  const doc = { ...createDoc('Test', 'FR'), items, boards: [board] };
   return { doc, board, cuisine, lumiere, rcd };
 }
 
@@ -418,22 +418,47 @@ describe('contrôles croisés plan / tableau', () => {
     return f;
   };
 
-  it('signale trop de prises sur un circuit 2,5 mm²', () => {
-    const f = withSockets(9, 2.5);
+  it('France : signale plus de 12 prises sur un circuit 2,5 mm²', () => {
+    const f = withSockets(13, 2.5);
     const checks = runLinkChecks(f.doc, f.board);
     expect(checks).toHaveLength(1);
     expect(checks[0]).toMatchObject({ severity: 'warn', deviceId: f.cuisine.id });
-    expect(checks[0]!.message).toMatch(/9 prises raccordées, 8 conseillées/);
+    expect(checks[0]!.message).toMatch(/13 prises, 12 au maximum \(NF C 15-100\)/);
   });
 
   it('ne signale rien dans la limite', () => {
-    const f = withSockets(8, 2.5);
+    const f = withSockets(12, 2.5);
     expect(runLinkChecks(f.doc, f.board)).toEqual([]);
   });
 
-  it('applique la limite de la section réellement retenue (1,5 mm² → 5 prises)', () => {
-    const f = withSockets(6, 1.5);
-    expect(runLinkChecks(f.doc, f.board)[0]!.message).toMatch(/5 conseillées/);
+  it('France : applique la limite de la section réellement retenue (1,5 mm² → 8 prises)', () => {
+    const f = withSockets(9, 1.5);
+    expect(runLinkChecks(f.doc, f.board)[0]!.message).toMatch(/8 au maximum/);
+  });
+
+  it('Belgique : 8 points par circuit, points lumineux compris, et 2,5 mm² pour des prises', () => {
+    const f = withSockets(6, 2.5);
+    f.doc.project.country = 'BE';
+    f.doc.items.push(sym(50, 'lampe', 0, 20, f.cuisine.id), sym(51, 'lampe', 20, 20, f.cuisine.id));
+    expect(runLinkChecks(f.doc, f.board)).toEqual([]); // 6 prises + 2 points lumineux = 8
+    f.doc.items.push(sym(52, 'lampe', 40, 20, f.cuisine.id));
+    expect(runLinkChecks(f.doc, f.board)[0]!.message).toMatch(/9 points, 8 au maximum \(RGIE\)/);
+
+    const thin = withSockets(2, 1.5);
+    thin.doc.project.country = 'BE';
+    const checks = runLinkChecks(thin.doc, thin.board);
+    expect(checks[0]).toMatchObject({ severity: 'error' });
+    expect(checks[0]!.message).toMatch(/2,5 mm² au minimum/);
+  });
+
+  it('Belgique : une salle de bains demande un différentiel de 30 mA', () => {
+    const f = fixture([room(1, 0, 0, 100, 100, 'Salle de bains', 'sdb')]);
+    f.doc.project.country = 'BE';
+    f.rcd.sensitivity = 300;
+    f.doc.items.push(sym(60, 'prise', 10, 10, f.cuisine.id));
+    expect(runLinkChecks(f.doc, f.board).some((c) => /30 mA attendu/.test(c.message))).toBe(true);
+    f.rcd.sensitivity = 30;
+    expect(runLinkChecks(f.doc, f.board).some((c) => /30 mA attendu/.test(c.message))).toBe(false);
   });
 
   it('le plan signale ce qui n’est raccordé à rien — seulement s’il existe un tableau', () => {

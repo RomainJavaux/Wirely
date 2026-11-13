@@ -1,5 +1,5 @@
 import { USAGES, getDeviceDef } from './catalog';
-import { analyze, deviceWidth, effectiveSection, effectiveUsage, variantOf } from './layout';
+import { analyze, deviceWidth, effectiveSection, effectiveUsage, variantOf, type RefScheme } from './layout';
 import type { Board, Device } from './types';
 
 export const fmtSection = (s: number): string => `${String(s).replace('.', ',')} mm²`;
@@ -61,8 +61,12 @@ export interface CircuitRow {
 }
 
 /** Tableau de repérage des circuits (un par disjoncteur / disjoncteur différentiel). */
-export function circuitRows(board: Board, wired: (deviceId: number) => string = () => ''): CircuitRow[] {
-  const a = analyze(board);
+export function circuitRows(
+  board: Board,
+  wired: (deviceId: number) => string = () => '',
+  scheme: RefScheme = 'numbers',
+): CircuitRow[] {
+  const a = analyze(board, scheme);
   return a.circuits.map((d) => {
     const rcd = a.protectedBy.get(d.id) ?? null;
     const section = effectiveSection(d);
@@ -84,9 +88,9 @@ export function circuitRows(board: Board, wired: (deviceId: number) => string = 
 const csvCell = (v: string): string => (/[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
 /** CSV (séparateur « ; », UTF-8 avec BOM) ouvrable directement dans Excel. */
-export function circuitsCsv(board: Board, wired: (deviceId: number) => string = () => ''): string {
+export function circuitsCsv(board: Board, wired: (deviceId: number) => string = () => '', scheme: RefScheme = 'numbers'): string {
   const head = ['Repère', 'Désignation', 'Destination', 'Appareil', 'Protection', 'Différentiel amont', 'Section', 'Usage', 'Raccordé au plan', 'Remarque'];
-  const rows = circuitRows(board, wired).map((r) =>
+  const rows = circuitRows(board, wired, scheme).map((r) =>
     [r.ref, r.label, r.dest, r.device, r.protection, r.rcd, r.section, r.usage, r.wired, r.note].map(csvCell).join(';'),
   );
   return '﻿' + [head.join(';'), ...rows].join('\r\n') + '\r\n';
@@ -101,8 +105,8 @@ export interface OutputRow {
 }
 
 /** Sorties nommées des modules de commande (Nikobus, Niko Home Control…), module par module. */
-export function outputRows(board: Board): OutputRow[] {
-  const a = analyze(board);
+export function outputRows(board: Board, scheme: RefScheme = 'numbers'): OutputRow[] {
+  const a = analyze(board, scheme);
   const rows: OutputRow[] = [];
   for (const d of a.busModules) {
     const def = getDeviceDef(d.kind);

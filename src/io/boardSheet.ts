@@ -3,6 +3,7 @@ import { bomLines, circuitRows, circuitsCsv, outputRows } from '../domain/board/
 import { analyze, effectiveUsage } from '../domain/board/layout';
 import type { Board } from '../domain/board/types';
 import { allLinks, linksSummary } from '../domain/link/links';
+import { refSchemeOf } from '../domain/rules';
 import type { Doc } from '../domain/types';
 import { renderBoard } from '../render/board/boardSvg';
 import { renderUnifilaire } from '../render/board/unifilaire';
@@ -31,7 +32,8 @@ function usageLegend(board: Board): string {
 export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
   const sections: SheetSection[] = [];
 
-  const front = renderBoard(board, { interactive: false });
+  const scheme = doc ? refSchemeOf(doc) : 'numbers';
+  const front = renderBoard(board, { interactive: false, scheme });
   const legend = usageLegend(board);
   sections.push({
     key: 'front',
@@ -41,13 +43,13 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
     height: front.height + (legend ? 34 : 0),
   });
 
-  const a = analyze(board);
+  const a = analyze(board, scheme);
   if (a.groups.length > 0 || a.busModules.length > 0) {
-    const uni = renderUnifilaire(board);
+    const uni = renderUnifilaire(board, scheme);
     sections.push({ key: 'uni', title: 'Schéma unifilaire', ...uni });
   }
 
-  const circuits = circuitRows(board, wiredText(doc));
+  const circuits = circuitRows(board, wiredText(doc), scheme);
   if (circuits.length > 0) {
     const t = table(1200, [
       { title: 'Repère', frac: 0.05, get: (r) => r.ref },
@@ -63,7 +65,7 @@ export function buildBoardSections(board: Board, doc?: Doc): SheetSection[] {
     sections.push({ key: 'circuits', title: 'Repérage des circuits', svg: t.svg, width: 1200, height: t.height });
   }
 
-  const outputs = outputRows(board);
+  const outputs = outputRows(board, scheme);
   if (outputs.length > 0) {
     const t = table(1200, [
       { title: 'Repère', frac: 0.08, get: (r) => r.ref },
@@ -129,7 +131,7 @@ export const exportBoardPng = (doc: Doc, board: Board): void =>
 
 export const exportBoardCsv = (doc: Doc, board: Board): void =>
   downloadBlob(
-    new Blob([circuitsCsv(board, wiredText(doc))], { type: 'text/csv;charset=utf-8' }),
+    new Blob([circuitsCsv(board, wiredText(doc), refSchemeOf(doc))], { type: 'text/csv;charset=utf-8' }),
     safeName(`${board.name} - circuits`, 'csv'),
   );
 

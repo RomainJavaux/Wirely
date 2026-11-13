@@ -5,6 +5,7 @@ import { describeEquip, equipPlan, equipRooms, incompleteRooms, type EquipResult
 import { DEFAULT_ROOM_SIZE, findRoomSpot, metersToRoomUnits } from '../domain/plan/layout';
 import { roomAt, roomsOf } from '../domain/plan/metrics';
 import { getRoomKind } from '../domain/plan/roomKinds';
+import { rulesOf } from '../domain/rules';
 import type { Item, NewItem, Room, RoomKind, SymbolItem } from '../domain/types';
 import { wallRealignments } from '../domain/walls/snap';
 import type { Store } from './store';
@@ -34,6 +35,8 @@ export interface QuickRoom {
   depthM: number;
   /** Pièce contre laquelle poser la nouvelle (la sélection, en général). */
   nearId?: number | null;
+  /** Pièce créée depuis la liste : dimensions usuelles, à préciser plus tard. */
+  rough?: boolean;
 }
 
 /** Ajoute une pièce de dimensions données, collée aux autres. Retourne son identifiant. */
@@ -55,6 +58,7 @@ export function addRoomQuick(store: Store, spec: QuickRoom): number | null {
     h: spot.h,
     label: name === getRoomKind(spec.kind).name ? '' : name,
     kind: spec.kind,
+    ...(spec.rough ? { rough: true } : {}),
     parts: [],
   };
   // Les pièces sont au fond : elles passent avant les murs et les symboles.
@@ -153,7 +157,7 @@ export function generateBoard(store: Store): BoardReport | null {
   const { doc } = store.state;
   const plans = planCircuits(doc);
   const name = doc.boards.length === 0 ? 'Tableau principal' : `Tableau ${doc.boards.length + 1}`;
-  const gen = buildBoardFromPlan(plans, name, () => doc.nextId++);
+  const gen = buildBoardFromPlan(plans, name, () => doc.nextId++, rulesOf(doc));
   if (!gen) {
     notify(store, 'Rien à raccorder : posez d’abord des appareils (prises, lumières…) ou équipez les pièces.');
     return null;
@@ -217,7 +221,9 @@ export function connectUnlinked(store: Store): ConnectReport {
   const plans = planCircuits(doc);
   const board = store.activeBoard ?? doc.boards[0];
   if (board && plans.length > 0) {
-    const created = appendCircuits(board, plans, () => doc.nextId++);
+    const appended = appendCircuits(board, plans, () => doc.nextId++, rulesOf(doc));
+    const created = appended.circuits;
+    doc.boards = doc.boards.map((b) => (b.id === board.id ? appended.board : b));
     const byItem = new Map<number, number>();
     for (const { plan, device } of created) for (const id of plan.itemIds) byItem.set(id, device.id);
     doc.items = doc.items.map((i) => {

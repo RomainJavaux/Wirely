@@ -1,6 +1,6 @@
 import { BUS_SYSTEMS, USAGES, getDeviceDef, type BusSystem } from '../../domain/board/catalog';
 import { deviceName, deviceSpec, fmtSection } from '../../domain/board/bom';
-import { analyze, effectiveSection, effectiveUsage, isCircuitRole, type Group } from '../../domain/board/layout';
+import { analyze, effectiveSection, effectiveUsage, isCircuitRole, type Group, type RefScheme } from '../../domain/board/layout';
 import type { Board, Device } from '../../domain/board/types';
 import { esc } from '../../util/escape';
 import { wrapText } from './boardSvg';
@@ -45,8 +45,8 @@ type Column =
   | { kind: 'bus'; system: BusSystem; modules: Device[] };
 
 /** Schéma unifilaire généré automatiquement depuis l'implantation du tableau. */
-export function renderUnifilaire(board: Board): RenderedBoard {
-  const a = analyze(board);
+export function renderUnifilaire(board: Board, scheme: RefScheme = 'numbers'): RenderedBoard {
+  const a = analyze(board, scheme);
 
   const columns: Column[] = a.groups
     .filter((g) => g.members.length > 0 || g.head)

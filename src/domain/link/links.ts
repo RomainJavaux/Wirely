@@ -2,9 +2,10 @@ import { USAGES, getDeviceDef } from '../board/catalog';
 import { deviceSpec } from '../board/bom';
 import { analyze, effectiveUsage, isCircuitRole, type Analysis } from '../board/layout';
 import type { Board, Device } from '../board/types';
-import { getSymbol } from '../catalog';
+import { FIXED_KINDS, LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, getSymbol } from '../catalog';
 import { polylineLength, roomAt, roomsOf, toMeters } from '../plan/metrics';
 import { getRoomKind } from '../plan/roomKinds';
+import { refSchemeOf } from '../rules';
 import type { Doc, Item, Room, SymbolItem, Wire } from '../types';
 
 /**
@@ -13,7 +14,7 @@ import type { Doc, Item, Room, SymbolItem, Wire } from '../types';
  * change pas quand on déplace des appareils dans le tableau.
  */
 
-type Linkable = Pick<Doc, 'items' | 'boards' | 'scale'>;
+type Linkable = Pick<Doc, 'items' | 'boards' | 'scale'> & Partial<Pick<Doc, 'project'>>;
 
 export interface DeviceLocation {
   board: Board;
@@ -56,10 +57,11 @@ export interface CircuitOption {
 }
 
 /** Tous les disjoncteurs de tous les tableaux, dans l'ordre d'implantation. */
-export function circuitOptions(doc: Pick<Doc, 'boards'>): CircuitOption[] {
+export function circuitOptions(doc: Pick<Doc, 'boards'> & Partial<Pick<Doc, 'project'>>): CircuitOption[] {
   const out: CircuitOption[] = [];
+  const scheme = refSchemeOf(doc);
   for (const board of doc.boards) {
-    const a = analyze(board);
+    const a = analyze(board, scheme);
     for (const d of a.circuits) {
       const def = getDeviceDef(d.kind);
       const rcd = a.protectedBy.get(d.id) ?? null;
@@ -79,7 +81,7 @@ export function circuitOptions(doc: Pick<Doc, 'boards'>): CircuitOption[] {
 }
 
 /** Repère et couleur d'usage de chaque disjoncteur, pour étiqueter les éléments du plan. */
-export function circuitInfo(doc: Pick<Doc, 'boards'>): Map<number, { ref: string; color: string }> {
+export function circuitInfo(doc: Pick<Doc, 'boards'> & Partial<Pick<Doc, 'project'>>): Map<number, { ref: string; color: string }> {
   return new Map(circuitOptions(doc).map((o) => [o.id, { ref: o.ref, color: o.color }]));
 }
 
@@ -94,7 +96,7 @@ export function circuitTitle(doc: Pick<Doc, 'boards'>, o: CircuitOption): string
 }
 
 /** Retrouve le circuit dont le libellé a été saisi (liste de suggestions du navigateur). */
-export function circuitFromTitle(doc: Pick<Doc, 'boards'>, text: string): CircuitOption | null {
+export function circuitFromTitle(doc: Pick<Doc, 'boards'> & Partial<Pick<Doc, 'project'>>, text: string): CircuitOption | null {
   const wanted = text.trim().toLowerCase();
   if (!wanted) return null;
   return circuitOptions(doc).find((o) => circuitTitle(doc, o).toLowerCase() === wanted) ?? null;
@@ -108,15 +110,13 @@ export interface CircuitLinks {
   sockets: number;
   lights: number;
   switches: number;
+  /** Appareils fixes (four, lave-linge, radiateur…). */
+  fixed: number;
   /** Pièces desservies, avec le nombre d'appareils dans chacune. */
   rooms: { room: Room; label: string; count: number }[];
 }
 
-const SOCKETS = new Set(['prise']);
-const LIGHTS = new Set(['lampe', 'applique', 'spot']);
-const SWITCHES = new Set(['inter', 'va', 'poussoir']);
-
-const emptyLinks = (): CircuitLinks => ({ symbols: [], wires: [], length: 0, sockets: 0, lights: 0, switches: 0, rooms: [] });
+const emptyLinks = (): CircuitLinks => ({ symbols: [], wires: [], length: 0, sockets: 0, lights: 0, switches: 0, fixed: 0, rooms: [] });
 
 /** Ce qui est raccordé à chaque disjoncteur (uniquement ceux qui ont au moins un raccordement). */
 export function allLinks(doc: Linkable): Map<number, CircuitLinks> {
@@ -139,9 +139,10 @@ export function allLinks(doc: Linkable): Map<number, CircuitLinks> {
     } else if (it.type === 'symbol' && it.breaker !== null) {
       const l = get(it.breaker);
       l.symbols.push(it);
-      if (SOCKETS.has(it.kind)) l.sockets++;
-      else if (LIGHTS.has(it.kind)) l.lights++;
-      else if (SWITCHES.has(it.kind)) l.switches++;
+      if (SOCKET_KINDS.has(it.kind)) l.sockets++;
+      else if (LIGHT_KINDS.has(it.kind)) l.lights++;
+      else if (SWITCH_KINDS.has(it.kind)) l.switches++;
+      else if (FIXED_KINDS.has(it.kind)) l.fixed++;
     }
   }
 
@@ -170,7 +171,8 @@ export function linksSummary(l: CircuitLinks): string {
   if (l.sockets) parts.push(`${l.sockets} prise${l.sockets > 1 ? 's' : ''}`);
   if (l.lights) parts.push(`${l.lights} point${l.lights > 1 ? 's' : ''} lumineux`);
   if (l.switches) parts.push(`${l.switches} commande${l.switches > 1 ? 's' : ''}`);
-  const other = l.symbols.length - l.sockets - l.lights - l.switches;
+  if (l.fixed) parts.push(`${l.fixed} appareil${l.fixed > 1 ? 's' : ''} fixe${l.fixed > 1 ? 's' : ''}`);
+  const other = l.symbols.length - l.sockets - l.lights - l.switches - l.fixed;
   if (other > 0) parts.push(`${other} autre${other > 1 ? 's' : ''}`);
   if (l.length > 0) parts.push(`${l.length.toFixed(1).replace('.', ',')} m`);
   return parts.join(' · ');
@@ -219,9 +221,6 @@ export function clearBoardLinks(doc: Pick<Doc, 'items'>, boardId: number): void 
   doc.items = doc.items.map((i) => (i.type === 'symbol' && i.board === boardId ? { ...i, board: null } : i));
 }
 
-/** Nombre maximal de prises conseillé par circuit, selon sa section (repères indicatifs, NF C 15-100). */
-export const MAX_SOCKETS_BY_SECTION: Readonly<Record<number, number>> = { 1.5: 5, 2.5: 8 };
-
 export { isCircuitRole };
 
 const normalize = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -251,7 +250,7 @@ export function circuitSearchText(d: Device, a: Analysis, links: ReadonlyMap<num
 export function matchingDevices(doc: Linkable, board: Board, filter: string): Set<number> | null {
   const terms = normalize(filter).split(/\s+/).filter(Boolean);
   if (terms.length === 0) return null;
-  const a = analyze(board);
+  const a = analyze(board, refSchemeOf(doc));
   const links = allLinks(doc);
   const out = new Set<number>();
   for (const d of board.devices) {

@@ -3,8 +3,9 @@ import { parseBoards } from './board/parse';
 import { WIRE_TYPES } from './catalog';
 import { DEFAULT_SCALE, MAX_SCALE, MIN_SCALE } from './plan/metrics';
 import { ROOM_KINDS } from './plan/roomKinds';
+import { DEFAULT_COUNTRY, defaultProject, parseProject } from './rules';
 import type { Board } from './board/types';
-import type { Doc, Item, ItemType, Point, Rotation, RoomKind, RoomRect } from './types';
+import type { Country, Doc, Item, ItemType, Point, Rotation, RoomKind, RoomRect } from './types';
 
 export const DEFAULT_NAME = 'Mon installation';
 
@@ -16,8 +17,9 @@ export const MAX_CEILING = 500;
 /** Ordre de dessin : les pièces au fond, les textes au-dessus. */
 const DRAW_ORDER: readonly ItemType[] = ['room', 'wall', 'wire', 'symbol', 'text'];
 
-export const createDoc = (name = DEFAULT_NAME): Doc => ({
+export const createDoc = (name = DEFAULT_NAME, country: Country = DEFAULT_COUNTRY): Doc => ({
   name,
+  project: defaultProject(country),
   items: [],
   boards: [],
   scale: DEFAULT_SCALE,
@@ -74,6 +76,7 @@ function parseItem(raw: unknown, legacy: Map<number, string>): Item | null {
         h: r.h,
         label: isStr(r.label) ? r.label : '',
         kind: toKind(r.kind),
+        ...(r.rough === true ? { rough: true } : {}),
         parts: parseParts(r.parts),
       };
     case 'wall':
@@ -100,6 +103,7 @@ function parseItem(raw: unknown, legacy: Map<number, string>): Item | null {
         breaker: breakerOf(r, legacy),
         board: isNum(r.board) ? r.board : null,
         height: isNum(r.height) && r.height >= 0 && r.height <= 400 ? Math.round(r.height) : null,
+        ...(r.rough === true ? { rough: true } : {}),
       };
     case 'text':
       if (!isStr(r.text) || !isNum(r.x) || !isNum(r.y)) return null;
@@ -124,6 +128,7 @@ export function parseDoc(raw: unknown): Doc {
   );
   return {
     name: isStr(r.name) && r.name.trim() ? r.name : DEFAULT_NAME,
+    project: parseProject(r.project),
     items,
     boards,
     scale: isNum(r.scale) && r.scale >= MIN_SCALE && r.scale <= MAX_SCALE ? r.scale : DEFAULT_SCALE,

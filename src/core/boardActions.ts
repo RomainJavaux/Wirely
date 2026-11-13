@@ -7,6 +7,7 @@ import {
   firstFreeSlot,
   lastUsedRow,
   MAX_COLS,
+  MAX_ROWS,
   MIN_COLS,
   minCols,
 } from '../domain/board/layout';
@@ -16,8 +17,6 @@ import { clearBoardLinks, clearLinks } from '../domain/link/links';
 import type { Board, Device } from '../domain/board/types';
 import { notify } from './planActions';
 import type { Store } from './store';
-
-const MAX_ROWS = 8;
 
 /** Applique `change` au tableau actif (sans valider) ; retourne le nouveau tableau. */
 function edit(store: Store, change: (board: Board) => Board): Board | undefined {

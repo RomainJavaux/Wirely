@@ -20,6 +20,7 @@ const txt = (t: string, size = 8): string =>
 
 export const SYMBOLS: readonly SymbolDef[] = [
   { id: 'prise', category: 'Prises', name: 'Prise 2P+T', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z"/><path d="M0 -4V-11"/>' },
+  { id: 'prise2', category: 'Prises', name: 'Prise double', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z"/><path d="M-3 -4V-11M3 -4V-11"/>' },
   { id: 'prise_s', category: 'Prises', name: 'Prise spécialisée', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z" fill="#111"/><path d="M0 -4V-11"/>' },
   { id: 'rj45', category: 'Prises', name: 'Prise RJ45', svg: '<rect x="-10" y="-8" width="20" height="16"/>' + txt('RJ') },
   { id: 'tv', category: 'Prises', name: 'Prise TV', svg: '<rect x="-10" y="-8" width="20" height="16"/>' + txt('TV') },
@@ -56,6 +57,18 @@ export const SYMBOLS: readonly SymbolDef[] = [
     gap: [-17, -6, 34, 12],
   },
 ];
+
+/** Socles de prise : un socle double (dans un même ensemble) compte pour un point. */
+export const SOCKET_KINDS: ReadonlySet<string> = new Set(['prise', 'prise2']);
+export const LIGHT_KINDS: ReadonlySet<string> = new Set(['lampe', 'applique', 'spot']);
+export const SWITCH_KINDS: ReadonlySet<string> = new Set(['inter', 'va', 'poussoir']);
+/** Appareils fixes alimentés (four, lave-linge, radiateur, chauffe-eau…). */
+export const FIXED_KINDS: ReadonlySet<string> = new Set(['prise_s', 'radia', 'ce', 'vmc', 'vr']);
+
+export const isSocketKind = (kind: string): boolean => SOCKET_KINDS.has(kind);
+export const isLightKind = (kind: string): boolean => LIGHT_KINDS.has(kind);
+export const isSwitchKind = (kind: string): boolean => SWITCH_KINDS.has(kind);
+export const isFixedKind = (kind: string): boolean => FIXED_KINDS.has(kind);
 
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
 export const getSymbol = (id: SymbolKind): SymbolDef | undefined => BY_ID.get(id);

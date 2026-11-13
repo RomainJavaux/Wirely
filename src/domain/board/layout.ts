@@ -4,6 +4,24 @@ import type { Board, Device, UsageId } from './types';
 /** Nombre de modules par rail : bornes de la saisie libre. */
 export const MIN_COLS = 4;
 export const MAX_COLS = 48;
+/** Nombre maximal de rails d'un tableau. */
+export const MAX_ROWS = 12;
+
+/** Repérage des circuits : lettres (A, B, C… usage belge) ou numéros (1, 2, 3…). */
+export type RefScheme = 'letters' | 'numbers';
+
+/** Repère du n-ième circuit (n à partir de 1) : « 3 » ou « C » ; au-delà de Z : AA, AB… */
+export function circuitRef(n: number, scheme: RefScheme): string {
+  if (scheme === 'numbers') return String(n);
+  let s = '';
+  let k = n;
+  while (k > 0) {
+    const r = (k - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    k = Math.floor((k - 1) / 26);
+  }
+  return s;
+}
 
 export const isCircuitRole = (def: DeviceDef): boolean => def.role === 'breaker' || def.role === 'rcbo';
 
@@ -90,10 +108,11 @@ export interface Analysis {
 }
 
 /**
- * Déduit la structure électrique de l'implantation : sur un rail, un interrupteur différentiel
- * protège les disjoncteurs situés à sa droite, jusqu'au prochain différentiel.
+ * Déduit la structure électrique de l'implantation, lue rail après rail, de gauche à droite : un
+ * interrupteur différentiel protège les disjoncteurs qui le suivent (y compris sur les rails
+ * suivants, comme avec un peigne ou un pontage) jusqu'au prochain différentiel.
  */
-export function analyze(board: Board): Analysis {
+export function analyze(board: Board, scheme: RefScheme = 'numbers'): Analysis {
   const refs = new Map<number, string>();
   const protectedBy = new Map<number, Device | null>();
   const circuits: Device[] = [];
@@ -103,16 +122,16 @@ export function analyze(board: Board): Analysis {
   const counters = new Map<string, number>();
   let circuitNo = 0;
   let usedModules = 0;
+  let current: Group | null = null;
 
   for (let row = 0; row < board.rows; row++) {
-    let current: Group | null = null;
     for (const d of devicesInRow(board, row)) {
       const def = getDeviceDef(d.kind);
       if (!def) continue;
       usedModules += deviceWidth(d);
 
       if (isCircuitRole(def)) {
-        refs.set(d.id, String(++circuitNo));
+        refs.set(d.id, circuitRef(++circuitNo, scheme));
         circuits.push(d);
       } else if (def.refPrefix) {
         const n = (counters.get(def.refPrefix) ?? 0) + 1;
@@ -162,3 +181,54 @@ export function minCols(board: Board): number {
 
 /** Dernier rail contenant un appareil (-1 si le tableau est vide). */
 export const lastUsedRow = (board: Board): number => board.devices.reduce((m, d) => Math.max(m, d.row), -1);
+
+/** Vrai pour un différentiel « général » : en tête, de sensibilité supérieure à 30 mA (300 mA en Belgique). */
+export function generalRcd(board: Board): Device | null {
+  const a = analyze(board);
+  const first = a.groups.find((g) => g.head)?.head ?? null;
+  return first && (first.sensitivity ?? 30) > 30 ? first : null;
+}
+
+/**
+ * Ajoute un appareil à la fin du groupe d'un différentiel (`headId` null : à la fin du tableau).
+ * S'il n'y a plus de place sur le rail, l'appareil passe au rail suivant, inséré si nécessaire.
+ * Retourne le tableau modifié (les autres appareils sont décalés d'un rail si besoin).
+ */
+export function appendToGroup(board: Board, headId: number | null, device: Device): Board {
+  const width = deviceWidth(device);
+  const ordered = [...board.devices].sort((p, q) => p.row - q.row || p.col - q.col);
+
+  // Dernier appareil du groupe, dans l'ordre de lecture.
+  let last: Device | null = null;
+  if (headId === null) {
+    last = ordered[ordered.length - 1] ?? null;
+  } else {
+    let inside = false;
+    for (const d of ordered) {
+      const role = getDeviceDef(d.kind)?.role;
+      if (d.id === headId) {
+        inside = true;
+        last = d;
+      } else if (inside) {
+        if (role === 'rcd' || role === 'feeder') break;
+        last = d;
+      }
+    }
+  }
+
+  const cols = Math.max(board.cols, width);
+  if (!last) return { ...board, cols, devices: [...board.devices, { ...device, row: 0, col: 0 }] };
+
+  const end = last.col + deviceWidth(last);
+  const sameRow = { ...board, cols };
+  if (canPlace(sameRow, last.row, end, width)) {
+    return { ...board, cols, devices: [...board.devices, { ...device, row: last.row, col: end }] };
+  }
+
+  // Rail suivant : libre s'il est vide, sinon on insère un rail (les suivants descendent d'un cran).
+  const row = last.row + 1;
+  const occupied = board.devices.some((d) => d.row === row);
+  const devices = occupied ? board.devices.map((d) => (d.row >= row ? { ...d, row: d.row + 1 } : d)) : board.devices;
+  const rows = Math.max(board.rows + (occupied ? 1 : 0), row + 1);
+  return { ...board, cols, rows, devices: [...devices, { ...device, row, col: 0 }] };
+}

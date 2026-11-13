@@ -30,6 +30,10 @@ export interface Device {
   usage: UsageId | null;
   /** Section de câble en mm² ; null = déduite automatiquement du calibre. */
   section: number | null;
+  /** Type de câble (XVB, VOB, R2V…) ; absent : celui du chantier. */
+  cable?: string;
+  /** Mode de pose ; absent : celui du chantier. */
+  laying?: string;
   note: string;
 }
 

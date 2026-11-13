@@ -4,6 +4,7 @@ import type { Board } from '../domain/board/types';
 import { allLinks, linksSummary, isElectrical, unlinkedItems } from '../domain/link/links';
 import { planSubtitle } from '../domain/plan/export';
 import { planNeeds } from '../domain/plan/needs';
+import { refSchemeOf, rulesOf } from '../domain/rules';
 import type { Doc } from '../domain/types';
 import { buildPlanSections } from './exporter';
 import { buildBoardSections } from './boardSheet';
@@ -71,7 +72,7 @@ export function dossierIssues(doc: Doc): DossierIssue[] {
     out.push({ severity: 'info', text: 'Aucun tableau : les circuits ne sont pas encore définis.', fix: 'board' });
   }
   for (const b of doc.boards) {
-    const checks = runChecks(b);
+    const checks = runChecks(b, rulesOf(doc));
     const errors = checks.filter((c) => c.severity === 'error').length;
     const warns = checks.filter((c) => c.severity === 'warn').length;
     if (errors + warns > 0) {
@@ -111,7 +112,7 @@ export function exportDossierCircuitsCsv(doc: Doc, board: Board): void {
     return l ? linksSummary(l) : '';
   };
   downloadBlob(
-    new Blob([circuitsCsv(board, wired)], { type: 'text/csv;charset=utf-8' }),
+    new Blob([circuitsCsv(board, wired, refSchemeOf(doc))], { type: 'text/csv;charset=utf-8' }),
     safeName(`${doc.name} - ${board.name} - circuits`, 'csv'),
   );
 }
