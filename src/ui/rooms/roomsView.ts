@@ -1,7 +1,8 @@
 import { assignBreaker, showItemOnPlan } from '../../core/links';
 import { connectUnlinked } from '../../core/planActions';
-import { addPoint, addRoomOfKind, deletePoint, deleteRoom, removePoint, renameRoom } from '../../core/pointActions';
+import { addPoint, addRoomOfKind, deletePoint, deleteRoom, removePoint, renameRoom, setSocketKind } from '../../core/pointActions';
 import type { Store } from '../../core/store';
+import { SOCKET_SERIES, isSocketKind } from '../../domain/catalog';
 import { isElectrical } from '../../domain/link/links';
 import { roomsOf, roomStats } from '../../domain/plan/metrics';
 import { roomNeeds } from '../../domain/plan/needs';
@@ -96,6 +97,10 @@ export class RoomsView {
       if (item?.type === 'symbol') store.updateItem({ ...item, label: (input as HTMLInputElement).value });
     });
     delegate(el, 'change', '[data-point-label]', () => store.commit());
+    // Une prise comptée simple se révèle double (ou l'inverse) : on la change sur place.
+    delegate(el, 'change', '[data-point-kind]', (sel) => {
+      setSocketKind(store, Number(sel.dataset.pointKind), (sel as HTMLSelectElement).value);
+    });
 
     // Pièce : nom, type, suppression.
     delegate(el, 'input', '[data-room-name]', (input) => {
@@ -296,7 +301,8 @@ export class RoomsView {
 
       ${activeBar}
 
-      <div class="counter-grid">${main.map(tile).join('')}</div>
+      <div class="counter-grid sockets">${main.filter((t) => t.group === 'prises').map(tile).join('')}</div>
+      <div class="counter-grid">${main.filter((t) => t.group !== 'prises').map(tile).join('')}</div>
       ${groups}
       ${hiddenCount > 0 || this.showMore ? `<button type="button" class="more-btn" data-more>${this.showMore ? 'Moins de types' : `Appareils fixes et autres types (${hiddenCount})`} ${icon('down', 14)}</button>` : ''}
       ${minimums}
@@ -324,7 +330,14 @@ export class RoomsView {
         </button>`;
     return `<li class="point${p.rough ? ' rough' : ''}">
       ${glyph(p.kind, 24)}
-      <span class="point-name">${esc(type?.label ?? p.kind)}</span>
+      ${
+        isSocketKind(p.kind)
+          ? `<select class="point-name point-kind" data-point-kind="${p.id}" aria-label="Type de prise">${SOCKET_SERIES.map((k) => {
+              const t = types.find((x) => x.kind === k);
+              return `<option value="${k}"${k === p.kind ? ' selected' : ''}>${esc(t?.label ?? k)}</option>`;
+            }).join('')}</select>`
+          : `<span class="point-name">${esc(type?.label ?? p.kind)}</span>`
+      }
       <input type="text" data-point-label="${p.id}" value="${esc(p.label)}" placeholder="Repère libre (ex. plan de travail)" aria-label="Repère du point">
       ${circuit}
       <button type="button" class="icon" data-point-plan="${p.id}" title="${p.rough ? 'Position à vérifier : voir sur le plan' : 'Voir sur le plan'}" aria-label="Voir sur le plan">${icon('pin', 16)}</button>

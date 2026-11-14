@@ -1,7 +1,7 @@
 import { getDeviceDef } from '../board/catalog';
 import { analyze, appendToGroup, createDevice, effectiveSection, effectiveUsage, isCircuitRole, lastUsedRow } from '../board/layout';
 import type { Board, Device, DiffType, UsageId } from '../board/types';
-import { LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS } from '../catalog';
+import { LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, outletsOf } from '../catalog';
 import { roomAt, roomsOf } from '../plan/metrics';
 import { getRoomKind } from '../plan/roomKinds';
 import { COOKER, TYPE_A_APPLIANCE, WET_APPLIANCE, rulesOf, sectionFor, type RuleSet } from '../rules';
@@ -95,6 +95,25 @@ const chunk = <T>(list: T[], size: number): T[][] => {
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
   return out;
 };
+
+/** Comme `chunk`, mais chaque élément pèse `weight` (une prise double compte pour deux socles). */
+function chunkBy<T>(list: T[], max: number, weight: (x: T) => number): T[][] {
+  const out: T[][] = [];
+  let current: T[] = [];
+  let used = 0;
+  for (const x of list) {
+    const w = weight(x);
+    if (current.length > 0 && used + w > max) {
+      out.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(x);
+    used += w;
+  }
+  if (current.length > 0) out.push(current);
+  return out;
+}
 
 /** « Salle de bains / WC » ou « Séjour et 2 autres ». */
 function namesLabel(names: string[]): string {
@@ -216,17 +235,20 @@ export function planCircuits(doc: Pick<Doc, 'items' | 'project'>, opts: { onlyUn
     const zone: SocketZone = kind ? SOCKET_ZONE[kind] : 'sejour';
     socketZones.set(zone, [...(socketZones.get(zone) ?? []), s]);
   }
-  // En France, la cuisine est câblée en 2,5 mm² (12 prises) ; ailleurs en 1,5 mm² (8 prises).
+  // En France, la cuisine est câblée en 2,5 mm² (12 socles) ; ailleurs en 1,5 mm² (8 socles).
+  // Belgique : une prise multiple compte pour un point ; France : chaque socle compte.
   const maxFor = (zone: SocketZone): number => (be ? 8 : zone === 'cuisine' ? 12 : 8);
+  const weight = (s: SymbolItem): number => (be ? 1 : outletsOf(s.kind));
+  const weightOf = (list: readonly SymbolItem[]): number => list.reduce((n, s) => n + weight(s), 0);
   const order: SocketZone[] = ['cuisine', 'sejour', 'chambres', 'annexes', 'ext'];
   // Une petite zone (≤ 3 prises) rejoint une autre zone quand le total reste dans la limite.
   for (const zone of order) {
     const list = socketZones.get(zone);
-    if (!list || list.length === 0 || list.length > 3 || zone === 'cuisine' || zone === 'ext') continue;
+    if (!list || list.length === 0 || weightOf(list) > 3 || zone === 'cuisine' || zone === 'ext') continue;
     const host = order
       .filter((z) => z !== zone && z !== 'cuisine' && z !== 'ext')
-      .map((z) => ({ z, n: socketZones.get(z)?.length ?? 0 }))
-      .filter((h) => h.n > 0 && h.n + list.length <= 8)
+      .map((z) => ({ z, n: weightOf(socketZones.get(z) ?? []) }))
+      .filter((h) => h.n > 0 && h.n + weightOf(list) <= 8)
       .sort((a, b) => b.n - a.n)[0];
     if (host) {
       socketZones.set(host.z, [...(socketZones.get(host.z) ?? []), ...list]);
@@ -234,7 +256,7 @@ export function planCircuits(doc: Pick<Doc, 'items' | 'project'>, opts: { onlyUn
     }
   }
   for (const zone of order) {
-    const parts = chunk(socketZones.get(zone) ?? [], maxFor(zone));
+    const parts = chunkBy(socketZones.get(zone) ?? [], maxFor(zone), weight);
     parts.forEach((part, i) => {
       const served = roomsServed(part, ctx);
       const rating = be ? rules.ratings.sockets : zone === 'cuisine' ? 20 : rules.ratings.sockets;
@@ -512,6 +534,7 @@ export function suggestCircuit(doc: Pick<Doc, 'items' | 'boards' | 'scale' | 'pr
         // Reste-t-il de la place une fois cet appareil ajouté ?
         const load = {
           sockets: (l?.sockets ?? 0) + (SOCKET_KINDS.has(item.kind) ? 1 : 0),
+          outlets: (l?.outlets ?? 0) + outletsOf(item.kind),
           lights: (l?.lights ?? 0) + (LIGHT_KINDS.has(item.kind) ? 1 : 0),
           fixed: l?.fixed ?? 0,
         };

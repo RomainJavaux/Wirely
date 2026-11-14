@@ -424,7 +424,7 @@ describe('contrôles croisés plan / tableau', () => {
     const checks = runLinkChecks(f.doc, f.board);
     expect(checks).toHaveLength(1);
     expect(checks[0]).toMatchObject({ severity: 'warn', deviceId: f.cuisine.id });
-    expect(checks[0]!.message).toMatch(/13 prises, 12 au maximum \(NF C 15-100\)/);
+    expect(checks[0]!.message).toMatch(/13 socles, 12 au maximum \(NF C 15-100\)/);
   });
 
   it('ne signale rien dans la limite', () => {

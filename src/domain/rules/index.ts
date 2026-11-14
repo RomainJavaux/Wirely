@@ -9,8 +9,10 @@ import type { Country, Doc, JobKind, ProjectInfo } from '../types';
 
 /** Ce qu'alimente un circuit, pour le comparer aux limites du pays. */
 export interface CircuitLoad {
-  /** Socles de prise (un socle multiple dans un même ensemble compte pour un). */
+  /** Prises de courant, une par boîtier (une prise double compte pour une). */
   sockets: number;
+  /** Socles de prise (une prise double en compte deux). */
+  outlets: number;
   /** Points lumineux. */
   lights: number;
   /** Appareils fixes raccordés (four, lave-linge, radiateur…). */
@@ -75,7 +77,8 @@ const BE: RuleSet = {
   docs: { unifilaire: 'Schéma unifilaire', position: 'Schéma de position', controller: 'l’organisme de contrôle agréé', copies: 3 },
   vat: 21,
   limit(load) {
-    // Sur un circuit comportant des prises, chaque socle, point lumineux et appareil fixe compte.
+    // Sur un circuit comportant des prises, chaque prise (simple ou multiple), point lumineux et
+    // appareil fixe compte pour un point.
     if (load.sockets > 0) return { used: load.sockets + load.lights + load.fixed, max: 8, unit: 'points' };
     return { used: load.lights + load.fixed, max: null, unit: 'points' };
   },
@@ -100,7 +103,8 @@ const FR: RuleSet = {
   docs: { unifilaire: 'Schéma unifilaire', position: 'Plan d’implantation', controller: 'le Consuel', copies: 1 },
   vat: 20,
   limit(load, section) {
-    if (load.sockets > 0) return { used: load.sockets, max: section <= 1.5 ? 8 : 12, unit: 'prises' };
+    // Depuis 2015, chaque socle compte : une prise double en vaut deux.
+    if (load.sockets > 0) return { used: load.outlets, max: section <= 1.5 ? 8 : 12, unit: 'socles' };
     if (load.lights > 0) return { used: load.lights, max: 8, unit: 'points lumineux' };
     return { used: load.fixed, max: null, unit: 'appareils' };
   },

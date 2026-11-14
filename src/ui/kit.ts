@@ -112,7 +112,7 @@ export function circuitViews(doc: Doc): CircuitView[] {
       const usage = USAGES[effectiveUsage(d)];
       const l = links.get(d.id);
       const section = effectiveSection(d);
-      const load = rules.limit({ sockets: l?.sockets ?? 0, lights: l?.lights ?? 0, fixed: l?.fixed ?? 0 }, section ?? 2.5);
+      const load = rules.limit({ sockets: l?.sockets ?? 0, outlets: l?.outlets ?? 0, lights: l?.lights ?? 0, fixed: l?.fixed ?? 0 }, section ?? 2.5);
       out.push({
         device: d,
         board,

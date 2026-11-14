@@ -7,10 +7,10 @@ import {
   showItemIn3D,
   showWall,
 } from '../core/links';
-import { equipRoom } from '../core/planActions';
-import { confirmPositions } from '../core/pointActions';
+import { connectUnlinked, equipRoom } from '../core/planActions';
+import { confirmPositions, setSocketKind } from '../core/pointActions';
 import type { Store } from '../core/store';
-import { WIRE_TYPES, WIRE_TYPE_IDS, getSymbol } from '../domain/catalog';
+import { SOCKET_SERIES, WIRE_TYPES, WIRE_TYPE_IDS, getSymbol, isSocketKind, outletsOf } from '../domain/catalog';
 import { suggestCircuit } from '../domain/link/autoCircuits';
 import { circuitLinks, circuitOptions, circuitTitle, isElectrical } from '../domain/link/links';
 import { fmtArea, fmtLength, fmtMeters, polylineLength, roomAt, roomsOf, roomStats, toMeters, wireLengthM } from '../domain/plan/metrics';
@@ -34,6 +34,7 @@ import { snapToWall } from '../domain/walls/snap';
 import { esc } from '../util/escape';
 import { bindBreakerField, breakerFieldHtml } from './breakerField';
 import { qs } from './dom';
+import { glyph } from './kit';
 
 const TITLES: Record<Item['type'], string> = {
   room: 'Pièce',
@@ -42,6 +43,9 @@ const TITLES: Record<Item['type'], string> = {
   symbol: 'Symbole',
   text: 'Texte',
 };
+
+/** Libellés courts des prises, de la simple à la quadruple. */
+const SOCKET_LABELS = ['Simple', 'Double', 'Triple', 'Quadruple'];
 
 /** Hauteurs de pose courantes (cm), proposées en suggestion. */
 const HEIGHTS = [5, 30, 110, 120, 150, 190, 220];
@@ -169,12 +173,28 @@ export class PropertiesPanel {
     if (item.breaker !== null || !isElectrical(item) || doc.boards.length === 0) return '';
     const s = suggestCircuit(doc, item);
     if (!s) {
-      return '<p class="muted">Aucun circuit existant ne convient : « Raccorder automatiquement » (panneau Projet) en crée un.</p>';
+      return `<div class="suggest"><span>Aucun circuit existant ne convient.<small>« Raccorder » crée les circuits qui manquent.</small></span>
+        <button type="button" id="pConnect">Raccorder</button></div>`;
     }
     const o = circuitOptions(doc).find((x) => x.id === s.deviceId);
     if (!o) return '';
     return `<div class="suggest"><span>Suggestion : <b>${esc(circuitTitle(doc, o))}</b><small>${esc(s.reason)}</small></span>
       <button type="button" id="pSuggest">Raccorder</button></div>`;
+  }
+
+  /** Prise : simple, double, triple ou quadruple, d'un geste ; et ce qu'elle pèse sur son circuit. */
+  private socketField(item: SymbolItem): string {
+    const n = outletsOf(item.kind);
+    const note =
+      rulesOf(this.store.state.doc).country === 'BE'
+        ? 'Compte pour 1 point sur son circuit, quel que soit le nombre de socles (RGIE).'
+        : `Compte pour ${n} socle${n > 1 ? 's' : ''} sur son circuit (NF C 15-100).`;
+    return `<label class="f">Socles</label>
+      <div class="socket-pick" role="group" aria-label="Nombre de socles">${SOCKET_SERIES.map(
+        (k, i) =>
+          `<button type="button" class="${k === item.kind ? 'active' : ''}" data-socket="${k}" aria-pressed="${k === item.kind}">${glyph(k, 24)}<span>${SOCKET_LABELS[i]}</span></button>`,
+      ).join('')}</div>
+      <p class="muted small">${note}</p>`;
   }
 
   /** Position d'un appareil sur son mur : distances au coin et hauteur, modifiables. */
@@ -304,6 +324,7 @@ export class PropertiesPanel {
     if (item.type === 'symbol') {
       h += `<label class="f" for="pLabel">Nom / repère</label>
         <input type="text" id="pLabel" value="${esc(item.label)}" placeholder="ex. Prise plan de travail">`;
+      if (isSocketKind(item.kind)) h += this.socketField(item);
       if (isElectrical(item)) h += breakerFieldHtml(this.store, item.breaker) + this.suggestion(item);
       if (item.kind === 'tableau') h += this.boardField(item.board);
       h += this.positionSection(item);
@@ -459,6 +480,10 @@ export class PropertiesPanel {
       const it = symbolNow();
       const s = it ? suggestCircuit(store.state.doc, it) : null;
       if (s) assignBreaker(store, id, s.deviceId);
+    });
+    on('#pConnect', () => connectUnlinked(store));
+    this.el.querySelectorAll<HTMLButtonElement>('[data-socket]').forEach((b) => {
+      b.onclick = () => setSocketKind(store, id, b.dataset.socket as string);
     });
     on('#pSnap', () => {
       const it = symbolNow();

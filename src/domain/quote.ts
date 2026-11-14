@@ -32,6 +32,8 @@ export interface Quote {
 const BASE_PRICES: Readonly<Record<string, number>> = {
   prise: 55,
   prise2: 70,
+  prise3: 85,
+  prise4: 100,
   lampe: 60,
   applique: 60,
   spot: 45,

@@ -38,8 +38,9 @@ Barre latérale sur ordinateur, barre du bas sur téléphone.
 
 - **Chantier** — pays, avancement (points, circuits, plan, dossier), prochaine étape,
   renseignements du chantier, liste de contrôle.
-- **Pièces** — la liste des pièces et, pour chacune, les compteurs de points (prises, points
-  lumineux, commandes, appareils fixes), le circuit de chaque point.
+- **Pièces** — la liste des pièces et, pour chacune, les compteurs de points (prises simples à
+  quadruples, points lumineux, commandes, appareils fixes), le circuit de chaque point. Une prise
+  se change en double, triple ou quadruple sur place (ici ou dans le panneau de la sélection).
 - **Tableau** — trois vues du même tableau : **Circuits** (différentiels, calibre, section, câble,
   jauge de charge), **Face avant** (rails DIN, appareils modulaires, Niko) et **Unifilaire**.
 - **Plan** — les pièces à l'échelle. Déplacer une pièce emporte ses points ; la redimensionner les
@@ -55,12 +56,13 @@ Barre latérale sur ordinateur, barre du bas sur téléphone.
 Ce sont des **repères indicatifs** ; ils ne remplacent ni le règlement, ni l'organisme de contrôle,
 ni le jugement du professionnel.
 
-- **Belgique · RGIE** — 8 points au plus par circuit qui comporte des prises (une prise multiple
-  compte pour une), 2,5 mm² dès qu'il y a une prise, 1,5 mm² → 16 A et 2,5 mm² → 20 A, au moins deux
+- **Belgique · RGIE** — 8 points au plus par circuit qui comporte des prises (une prise multiple,
+  double à quadruple, compte pour une), 2,5 mm² dès qu'il y a une prise, 1,5 mm² → 16 A et 2,5 mm² → 20 A, au moins deux
   circuits d'éclairage, différentiel général 300 mA de type A, 30 mA pour la salle de bains, le
   lave-linge, le sèche-linge et le lave-vaisselle, disjoncteurs bipolaires, circuits repérés par
   des lettres, schémas datés et signés en trois exemplaires.
-- **France · NF C 15-100** — 8 prises en 1,5 mm² / 16 A, 12 en 2,5 mm² / 20 A, 8 points lumineux par
+- **France · NF C 15-100** — 8 socles en 1,5 mm² / 16 A, 12 en 2,5 mm² / 20 A (chaque socle compte :
+  une prise double en vaut deux), 8 points lumineux par
   circuit, différentiels 30 mA (type A pour la plaque et le lave-linge), 8 circuits au plus par
   différentiel, minimums par pièce, circuits numérotés.
 - **Estimation du câble** par circuit (tableau → points, descentes, marge de pose), par section.

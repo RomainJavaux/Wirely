@@ -1,11 +1,13 @@
-import { isElectrical, locateDevice } from '../domain/link/links';
+import { effectiveSection } from '../domain/board/layout';
+import { isSocketKind } from '../domain/catalog';
+import { circuitLinks, circuitOptions, isElectrical, locateDevice } from '../domain/link/links';
 import { placePoint } from '../domain/plan/equip';
 import { DEFAULT_ROOM_SIZE } from '../domain/plan/layout';
 import { roomsOf } from '../domain/plan/metrics';
 import { symbolsByRoom } from '../domain/plan/needs';
 import { getRoomKind } from '../domain/plan/roomKinds';
 import { allPoints, pointTypes, roomCounts } from '../domain/points';
-import { rulesFor } from '../domain/rules';
+import { rulesFor, rulesOf } from '../domain/rules';
 import type { Country, ProjectInfo, RoomKind, SymbolItem } from '../domain/types';
 import { addRoomQuick, notify } from './planActions';
 import type { Store } from './store';
@@ -117,6 +119,30 @@ export function deletePoint(store: Store, itemId: number): void {
   doc.items = doc.items.filter((i) => i.id !== itemId);
   if (store.state.selection === itemId) store.state.selection = null;
   store.commit();
+}
+
+/**
+ * Change une prise en simple, double, triple ou quadruple : même place, même circuit, même repère.
+ * Prévient si son circuit dépasse alors la limite du pays.
+ */
+export function setSocketKind(store: Store, itemId: number, kind: string): boolean {
+  const item = store.getItem(itemId);
+  if (item?.type !== 'symbol' || !isSocketKind(item.kind) || !isSocketKind(kind) || item.kind === kind) return false;
+  store.updateItem({ ...item, kind });
+  store.commit();
+
+  const { doc } = store.state;
+  const located = locateDevice(doc, item.breaker);
+  if (located && item.breaker !== null) {
+    const l = circuitLinks(doc, item.breaker);
+    const rules = rulesOf(doc);
+    const limit = rules.limit(l, effectiveSection(located.device) ?? 2.5);
+    if (limit.max !== null && limit.used > limit.max) {
+      const ref = circuitOptions(doc).find((o) => o.id === item.breaker)?.ref ?? '';
+      notify(store, `Circuit ${ref} : ${limit.used} ${limit.unit}, ${limit.max} au maximum (${rules.code}).`, { undo: true });
+    }
+  }
+  return true;
 }
 
 /** Raccorde des points à un circuit (null : les détache). */

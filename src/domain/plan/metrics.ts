@@ -1,4 +1,4 @@
-import { LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, getSymbol } from '../catalog';
+import { LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, getSymbol, outletsOf } from '../catalog';
 import { GRID } from '../geometry';
 import type { Doc, Item, Point, Room, SymbolItem, Wire, WireTypeId } from '../types';
 import { roomArea, roomBox, roomContains } from './rooms';
@@ -42,7 +42,7 @@ export interface RoomStats {
   /** Pièce composée de plusieurs rectangles : width/depth sont alors hors tout. */
   merged: boolean;
   symbols: SymbolItem[];
-  /** Prises 16 A (hors prises spécialisées, RJ45 et TV). */
+  /** Socles de prise 16 A, une prise double en compte deux (hors spécialisées, RJ45 et TV). */
   sockets: number;
   lights: number;
   switches: number;
@@ -85,7 +85,7 @@ export function roomStats(doc: Pick<Doc, 'items' | 'scale'>): RoomStats[] {
     const s = room ? stats.get(room.id) : undefined;
     if (!s) continue;
     s.symbols.push(it);
-    if (SOCKET_KINDS.has(it.kind)) s.sockets++;
+    if (SOCKET_KINDS.has(it.kind)) s.sockets += outletsOf(it.kind);
     else if (LIGHT_KINDS.has(it.kind)) s.lights++;
     else if (SWITCH_KINDS.has(it.kind)) s.switches++;
   }

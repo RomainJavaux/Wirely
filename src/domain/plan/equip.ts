@@ -348,6 +348,9 @@ function pickRoom(rooms: readonly Room[], order: readonly RoomKind[]): Room | un
 /** Noms au singulier et au pluriel, pour les messages (« 6 prises 16 A, 2 points lumineux… »). */
 const COUNT_NAMES: Readonly<Record<string, [string, string]>> = {
   prise: ['prise 16 A', 'prises 16 A'],
+  prise2: ['prise double', 'prises doubles'],
+  prise3: ['prise triple', 'prises triples'],
+  prise4: ['prise quadruple', 'prises quadruples'],
   prise_s: ['prise spécialisée', 'prises spécialisées'],
   rj45: ['prise RJ45', 'prises RJ45'],
   tv: ['prise TV', 'prises TV'],

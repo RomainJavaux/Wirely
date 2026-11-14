@@ -20,6 +20,10 @@ const ceiling = (w: number, h: number): Mounting => ({ where: 'ceiling', height:
 
 const MOUNTING: Readonly<Record<string, Mounting>> = {
   prise: wall(30, 8, 8),
+  // Prises multiples horizontales : environ 7 cm de plus par socle.
+  prise2: wall(30, 15, 8),
+  prise3: wall(30, 22, 8),
+  prise4: wall(30, 29, 8),
   prise_s: wall(30, 8, 8),
   rj45: wall(30, 8, 8),
   tv: wall(30, 8, 8),

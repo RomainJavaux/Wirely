@@ -27,7 +27,7 @@ export function runLinkChecks(doc: Pick<Doc, 'items' | 'boards' | 'scale' | 'pro
     const name = d.label.trim() ? ` « ${d.label.trim()} »` : '';
     const ref = `Circuit ${a.refs.get(d.id)}${name}`;
 
-    const limit = rules.limit({ sockets: l.sockets, lights: l.lights, fixed: l.fixed }, section ?? 2.5);
+    const limit = rules.limit({ sockets: l.sockets, outlets: l.outlets, lights: l.lights, fixed: l.fixed }, section ?? 2.5);
     if (limit.max !== null && limit.used > limit.max) {
       checks.push({
         severity: 'warn',

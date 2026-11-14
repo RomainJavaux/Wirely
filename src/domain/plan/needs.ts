@@ -1,5 +1,6 @@
 import { getRoomKind } from './roomKinds';
 import { roomAt, roomStats, roomsOf } from './metrics';
+import { outletsOf } from '../catalog';
 import type { Doc, Room, RoomKind, SymbolItem } from '../types';
 
 /**
@@ -106,7 +107,11 @@ export function planNeeds(doc: Pick<Doc, 'items' | 'scale'>): RoomNeedsReport[] 
     const kind = getRoomKind(s.room.kind);
     const symbols = placed.get(s.room.id) ?? [];
     const needs = needsFor(s.room.kind, s.area).map((n): NeedStatus => {
-      const have = symbols.filter((x) => x.kind === n.kind).length;
+      // Prises : chaque socle compte (une prise double en vaut deux).
+      const have =
+        n.kind === 'prise'
+          ? symbols.reduce((t, x) => t + outletsOf(x.kind), 0)
+          : symbols.filter((x) => x.kind === n.kind).length;
       return { ...n, have, missing: Math.max(0, n.min - have) };
     });
     const missing = needs.reduce((t, n) => t + n.missing, 0);

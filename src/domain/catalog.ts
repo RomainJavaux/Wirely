@@ -21,6 +21,8 @@ const txt = (t: string, size = 8): string =>
 export const SYMBOLS: readonly SymbolDef[] = [
   { id: 'prise', category: 'Prises', name: 'Prise 2P+T', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z"/><path d="M0 -4V-11"/>' },
   { id: 'prise2', category: 'Prises', name: 'Prise double', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z"/><path d="M-3 -4V-11M3 -4V-11"/>' },
+  { id: 'prise3', category: 'Prises', name: 'Prise triple', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z"/><path d="M-5 -4V-11M0 -4V-11M5 -4V-11"/>' },
+  { id: 'prise4', category: 'Prises', name: 'Prise quadruple', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z"/><path d="M-6 -4V-11M-2 -4V-11M2 -4V-11M6 -4V-11"/>' },
   { id: 'prise_s', category: 'Prises', name: 'Prise spécialisée', svg: '<path d="M-9 5A9 9 0 0 1 9 5Z" fill="#111"/><path d="M0 -4V-11"/>' },
   { id: 'rj45', category: 'Prises', name: 'Prise RJ45', svg: '<rect x="-10" y="-8" width="20" height="16"/>' + txt('RJ') },
   { id: 'tv', category: 'Prises', name: 'Prise TV', svg: '<rect x="-10" y="-8" width="20" height="16"/>' + txt('TV') },
@@ -58,8 +60,18 @@ export const SYMBOLS: readonly SymbolDef[] = [
   },
 ];
 
-/** Socles de prise : un socle double (dans un même ensemble) compte pour un point. */
-export const SOCKET_KINDS: ReadonlySet<string> = new Set(['prise', 'prise2']);
+/** Prises de courant, de la simple à la quadruple (un boîtier, plusieurs socles). */
+export const SOCKET_SERIES = ['prise', 'prise2', 'prise3', 'prise4'] as const;
+export const SOCKET_KINDS: ReadonlySet<string> = new Set(SOCKET_SERIES);
+
+/** Nombre de socles d'une prise : 2 pour une double… 0 pour ce qui n'est pas une prise de courant. */
+export const outletsOf = (kind: string): number => {
+  const i = (SOCKET_SERIES as readonly string[]).indexOf(kind);
+  return i === -1 ? 0 : i + 1;
+};
+
+/** Prise de 1 à 4 socles. */
+export const socketKind = (outlets: number): string => SOCKET_SERIES[Math.min(4, Math.max(1, Math.round(outlets))) - 1] as string;
 export const LIGHT_KINDS: ReadonlySet<string> = new Set(['lampe', 'applique', 'spot']);
 export const SWITCH_KINDS: ReadonlySet<string> = new Set(['inter', 'va', 'poussoir']);
 /** Appareils fixes alimentés (four, lave-linge, radiateur, chauffe-eau…). */

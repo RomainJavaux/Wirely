@@ -2,7 +2,7 @@ import { USAGES, getDeviceDef } from '../board/catalog';
 import { deviceSpec } from '../board/bom';
 import { analyze, effectiveUsage, isCircuitRole, type Analysis } from '../board/layout';
 import type { Board, Device } from '../board/types';
-import { FIXED_KINDS, LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, getSymbol } from '../catalog';
+import { FIXED_KINDS, LIGHT_KINDS, SOCKET_KINDS, SWITCH_KINDS, getSymbol, outletsOf } from '../catalog';
 import { polylineLength, roomAt, roomsOf, toMeters } from '../plan/metrics';
 import { getRoomKind } from '../plan/roomKinds';
 import { refSchemeOf } from '../rules';
@@ -107,7 +107,10 @@ export interface CircuitLinks {
   wires: Wire[];
   /** Longueur de câble raccordée, en mètres. */
   length: number;
+  /** Prises (une par boîtier). */
   sockets: number;
+  /** Socles de ces prises (une double en compte deux). */
+  outlets: number;
   lights: number;
   switches: number;
   /** Appareils fixes (four, lave-linge, radiateur…). */
@@ -116,7 +119,7 @@ export interface CircuitLinks {
   rooms: { room: Room; label: string; count: number }[];
 }
 
-const emptyLinks = (): CircuitLinks => ({ symbols: [], wires: [], length: 0, sockets: 0, lights: 0, switches: 0, fixed: 0, rooms: [] });
+const emptyLinks = (): CircuitLinks => ({ symbols: [], wires: [], length: 0, sockets: 0, outlets: 0, lights: 0, switches: 0, fixed: 0, rooms: [] });
 
 /** Ce qui est raccordé à chaque disjoncteur (uniquement ceux qui ont au moins un raccordement). */
 export function allLinks(doc: Linkable): Map<number, CircuitLinks> {
@@ -139,8 +142,10 @@ export function allLinks(doc: Linkable): Map<number, CircuitLinks> {
     } else if (it.type === 'symbol' && it.breaker !== null) {
       const l = get(it.breaker);
       l.symbols.push(it);
-      if (SOCKET_KINDS.has(it.kind)) l.sockets++;
-      else if (LIGHT_KINDS.has(it.kind)) l.lights++;
+      if (SOCKET_KINDS.has(it.kind)) {
+        l.sockets++;
+        l.outlets += outletsOf(it.kind);
+      } else if (LIGHT_KINDS.has(it.kind)) l.lights++;
       else if (SWITCH_KINDS.has(it.kind)) l.switches++;
       else if (FIXED_KINDS.has(it.kind)) l.fixed++;
     }
@@ -168,7 +173,10 @@ export const circuitLinks = (doc: Linkable, deviceId: number): CircuitLinks =>
 /** Texte court : « 6 prises · 2 lampes · 12,4 m ». */
 export function linksSummary(l: CircuitLinks): string {
   const parts: string[] = [];
-  if (l.sockets) parts.push(`${l.sockets} prise${l.sockets > 1 ? 's' : ''}`);
+  if (l.sockets) {
+    const extra = l.outlets > l.sockets ? ` (${l.outlets} socles)` : '';
+    parts.push(`${l.sockets} prise${l.sockets > 1 ? 's' : ''}${extra}`);
+  }
   if (l.lights) parts.push(`${l.lights} point${l.lights > 1 ? 's' : ''} lumineux`);
   if (l.switches) parts.push(`${l.switches} commande${l.switches > 1 ? 's' : ''}`);
   if (l.fixed) parts.push(`${l.fixed} appareil${l.fixed > 1 ? 's' : ''} fixe${l.fixed > 1 ? 's' : ''}`);

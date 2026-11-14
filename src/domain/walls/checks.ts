@@ -1,3 +1,4 @@
+import { isSocketKind } from '../catalog';
 import type { Doc } from '../types';
 import { faceLabel, roomFaces, symbolsOnFace, type WallFace } from './faces';
 import type { Room } from '../types';
@@ -21,7 +22,7 @@ export function runWallChecks(doc: Pick<Doc, 'items' | 'scale'>, room: Room, fac
   const label = faceLabel(face, roomFaces(room));
   for (const p of symbolsOnFace(doc, face)) {
     const name = p.item.label.trim() || p.item.kind;
-    if (['prise', 'prise_s', 'rj45', 'tv'].includes(p.item.kind) && p.v < MIN_SOCKET_HEIGHT) {
+    if ((isSocketKind(p.item.kind) || ['prise_s', 'rj45', 'tv'].includes(p.item.kind)) && p.v < MIN_SOCKET_HEIGHT) {
       checks.push({
         severity: 'warn',
         itemId: p.item.id,

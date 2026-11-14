@@ -37,6 +37,8 @@ const appliance = (key: string, label: string, main = false): PointType => ({
 const TYPES: readonly PointType[] = [
   { key: 'prise', kind: 'prise', label: 'Prise', group: 'prises', main: true },
   { key: 'prise2', kind: 'prise2', label: 'Prise double', group: 'prises', main: true },
+  { key: 'prise3', kind: 'prise3', label: 'Prise triple', group: 'prises', main: true },
+  { key: 'prise4', kind: 'prise4', label: 'Prise quadruple', group: 'prises', main: true },
   { key: 'lampe', kind: 'lampe', label: 'Point lumineux', group: 'eclairage', main: true },
   { key: 'applique', kind: 'applique', label: 'Applique', group: 'eclairage' },
   { key: 'spot', kind: 'spot', label: 'Spot', group: 'eclairage' },
